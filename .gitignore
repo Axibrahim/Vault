@@ -1,7 +1,7 @@
-@"
 # secrets
 .env
 .env.*
+!.env.example
 *.pem
 *.key
 serviceAccountKey.json
@@ -17,4 +17,3 @@ __pycache__/
 .vscode/
 .DS_Store
 Thumbs.db
-"@ set-content .gitignore
