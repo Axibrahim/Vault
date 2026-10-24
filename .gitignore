@@ -1,0 +1,20 @@
+@"
+# secrets
+.env
+.env.*
+*.pem
+*.key
+serviceAccountKey.json
+*-firebase-adminsdk-*.json
+
+# python
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# Editor / OS
+.vscode/
+.DS_Store
+Thumbs.db
+"@ set-content .gitignore
