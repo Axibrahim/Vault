@@ -9,7 +9,7 @@ def init_firebase(app):
         path = os.path.join(os.path.dirname(os.path.abspath(__file__)), path)
 
     if not os.path.isfile(path):
-        raise RuntimeError(f"firbase service account file not found: {path}")
+        raise RuntimeError(f"firebase service account file not found: {path}")
 
     firebase_admin.initialize_app(credentials.Certificate(path))
 

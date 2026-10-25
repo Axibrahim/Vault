@@ -30,7 +30,7 @@ def _clear_cookie(resp):
 def login_required(view):
     @wraps(view)
     def wrapper(*args, **kwargs):
-        cookie = request.cookies.get(current_app.config["AUTH__COOKIE_NAME"])
+        cookie = request.cookies.get(current_app.config["AUTH_COOKIE_NAME"])
         if not cookie:
             return _fail("Not authenticated", 401)
 
@@ -76,25 +76,25 @@ def public_config():
 @bp.post("/login")
 @limiter.limit("10 per minute; 60 per hour")
 def login():
-    data = request.getjson(silent=True) or {}
+    data = request.get_json(silent=True) or {}
     id_token = data.get("idToken")
     if not isinstance(id_token, str) or not 20 <= len(id_token) <= 4096:
-        return _fail("Invalid request", 401)
+        return _fail("Invalid request", 400)
 
     # 1) verify signature, expiry, audiance and revokation.
     try:
         decoded = fb_auth.verify_id_token(id_token, check_revoked=True)
     except Exception as e:
-        current_app.logger.warning("lpgin rejected: %s", type(e).__name__)
+        current_app.logger.warning("login rejected: %s", type(e).__name__)
         return _fail("Authentication failed", 401)
 
     # 2) our own rules on top of firebase's
-    if decoded.get("firebase", {}).get("sig_in_provider") != "google.com":
+    if decoded.get("firebase", {}).get("sign_in_provider") != "google.com":
         return _fail("Authentication failed", 401)
     if decoded.get("email_verified") is not True:
         return _fail("Authentication failed", 401)
     if time.time() - decoded.get("auth_time", 0) > current_app.config["LOGIN_MAX_AGE_SECONDS"]:
-        return _fail("Authentication fialed", 401)
+        return _fail("Authentication failed", 401)
 
     # 3) swap the short-lived ID token for a longer-lived session token
     duration = current_app.config["AUTH_SESSION_DURATION"]

@@ -16,11 +16,11 @@ class BaseConfig:
 
     # -- Auth session --
     AUTH_COOKIE_SAMESITE = "Strict"
-    AUTH_COOKIE_DURATION = timedelta(hours=8)   # Firebase allows 5 minutes to 14 days
+    AUTH_SESSION_DURATION = timedelta(hours=8)   # Firebase allows 5 minutes to 14 days
     LOGIN_MAX_AGE_SECONDS = 300                 # The Google sign-in must be this fresh
 
     # -- Firebase --
-    FIREBASE_CREDENTIALS_FILE = os.environ.get("FIREBASE_CREDENTIALS_FILE", "ServiceAccountKey.json")
+    FIREBASE_CREDENTIALS_FILE = os.environ.get("FIREBASE_CREDENTIALS_FILE", "serviceAccountKey.json")
     # Public web-app settings (They identify the project not secrets)
     FIREBASE_API_KEY = os.environ.get("FIREBASE_API_KEY", "")
     FIREBASE_AUTH_DOMAIN = os.environ.get("FIREBASE_AUTH_DOMAIN", "")

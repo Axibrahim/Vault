@@ -8,7 +8,7 @@ UNSAFE_METHODS = {"POST", "PATCH", "DELETE", "PUT"}
 def build_csp(auth_domain):
     return "; ".join([
     "default-src 'none'",       # block everything unless a rule below allows it
-    "script-src 'self'",
+    "script-src 'self' https://apis.google.com https://www.gstatic.com",
     "style-src 'self'",
     "img-src 'self' data:",
     "font-src 'self'",
@@ -17,7 +17,7 @@ def build_csp(auth_domain):
     f"frame-src http://{auth_domain}",
     "base-uri 'none'",
     "form-action 'self'",
-    "frame-ancestors" 'none',
+    "frame-ancestors 'none'",
 ])
 
 
@@ -43,7 +43,7 @@ def register_security(app):
             return jsonify(error="Forbidden"), 403
 
         # 2) Our own JS always adds this header. Plain HTML forms cannot.
-        if request.headers.ger("X-Vault-Request") !="1":
+        if request.headers.get("X-Vault-Request") !="1":
             return jsonify(error="Forbidden"), 403
 
         return None
@@ -52,7 +52,7 @@ def register_security(app):
     def add_securiry_headers(resp):
         resp.headers["Content-Security-Policy"] = csp
         resp.headers["X-Content-Type-Options"] = "nosniff"
-        resp.headers["X-Form-Options"] = "DENY"
+        resp.headers["X-Frame-Options"] = "DENY"
         resp.headers["Referrer-Policy"] = "no-referrer"     # your URLs are never leaked to other sites
         resp.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
         resp.headers["Cross-Origin-Opener-Policy"] = "same-origin-allow-popups"

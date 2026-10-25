@@ -34,6 +34,7 @@ $("login-btn").addEventListener("click", async () => {
     await signInWithGoogle();
     await start();
   } catch (err) {
+    console.error("login error:", err.code || err.status, err.message);
     setStatus("Sign-in failed");
   }
 });
