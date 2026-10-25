@@ -1,3 +1,7 @@
+[hidden] {
+  display: none !important;
+}
+
 body {
   font-family: system-ui, sans-serif;
   background: #0f1115;
@@ -6,4 +10,22 @@ body {
   place-items: center;
   min-height: 100vh;
   margin: 0;
+}
+
+main {
+  text-align: center;
+}
+
+button {
+  padding: 0.6rem 1.2rem;
+  border: 0;
+  border-radius: 8px;
+  background: #4f7cff;
+  color: #fff;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #3d66e0;
 }

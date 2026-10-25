@@ -4,13 +4,23 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Vault</title>
+  <link rel="icon" href="data:,">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
 </head>
 <body>
   <main>
     <h1>Vault</h1>
-    <p id="status">Checking server...</p>
+    <p id="status">Loading...</p>
+
+    <section id="login-view" hidden>
+      <button id="login-btn" type="button">Sign in with Google</button>
+    </section>
+
+    <section id="app-view" hidden>
+      <p>Signed in as <strong id="user-email"></strong></p>
+      <button id="logout-btn" type="button">Sign out</button>
+    </section>
   </main>
-  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  <script type="module" src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>
