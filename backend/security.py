@@ -14,7 +14,7 @@ def build_csp(auth_domain):
     "font-src 'self'",
     "connect-src 'self' https://identitytoolkit.googleapis.com "
     "https://securetoken.googleapis.com https://www.googleapis.com",
-    f"frame-src http://{auth_domain}",
+    f"frame-src https://{auth_domain}",
     "base-uri 'none'",
     "form-action 'self'",
     "frame-ancestors 'none'",
