@@ -3,6 +3,7 @@ from werkzeug.exceptions import HTTPException
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 import auth
+import devices
 from config import get_config
 from extensions import limiter
 from firebase_setup import init_firebase
@@ -21,6 +22,7 @@ def create_app():
     init_firebase(app)
     limiter.init_app(app)
     app.register_blueprint(auth.bp)
+    app.register_blueprint(devices.bp)
 
 
     @app.get("/")

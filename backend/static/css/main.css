@@ -29,3 +29,32 @@ button {
 button:hover {
   background: #3d66e0;
 }
+
+input {
+  display: block;
+  margin: 0.4rem auto 1rem;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid #3a3f4b;
+  border-radius: 8px;
+  background: #171a21;
+  color: #e6e6e6;
+  font-size: 1rem;
+}
+
+button {
+  margin: 0.3rem;
+}
+
+button:disabled {
+  background: #3a3f4b;
+  cursor: not-allowed;
+}
+
+button.danger {
+  background: #c0392b;
+}
+
+ul {
+  list-style: none;
+  padding: 0;
+}

@@ -18,6 +18,34 @@
 
     <section id="app-view" hidden>
       <p>Signed in as <strong id="user-email"></strong></p>
+
+      <div id="enroll-view" hidden>
+        <h2>Set up this computer</h2>
+        <p>Files from your phone will be saved into one folder that you choose.</p>
+        <p id="browser-warning" hidden>
+          This needs Chrome or Edge on a computer. Please open Vault there.
+        </p>
+        <label for="device-name">Computer name</label>
+        <input id="device-name" type="text" maxlength="40" placeholder="Home PC" autocomplete="off">
+        <button id="folder-btn" type="button">Choose folder</button>
+        <p>Folder: <strong id="folder-label">none chosen</strong></p>
+        <button id="enroll-btn" type="button" disabled>Finish setup</button>
+      </div>
+
+      <div id="desktop-view" hidden>
+        <h2 id="desktop-name"></h2>
+        <p>Receiving folder: <strong id="desktop-folder"></strong></p>
+        <p id="folder-access"></p>
+        <button id="regrant-btn" type="button" hidden>Allow folder access</button>
+        <button id="change-folder-btn" type="button">Change folder</button>
+        <button id="remove-btn" type="button" class="danger">Remove this computer</button>
+      </div>
+
+      <div id="other-view" hidden>
+        <p>This account is already set up on another computer, or this browser's data was cleared.</p>
+        <ul id="device-list"></ul>
+      </div>
+
       <button id="logout-btn" type="button">Sign out</button>
     </section>
   </main>

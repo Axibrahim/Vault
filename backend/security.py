@@ -37,7 +37,7 @@ def register_security(app):
         # 1) The browser must confirms that we are who sent the request
         origin = request.headers.get("Origin")
         if not origin:
-            return jsonify(error="Forbiddden"), 403
+            return jsonify(error="Forbidden"), 403
         parts = urlsplit(origin)
         if parts.scheme != request.scheme or parts.netloc != request.host:
             return jsonify(error="Forbidden"), 403
