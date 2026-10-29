@@ -1,4 +1,4 @@
-import { kvGet, kvSet, kvDelete } from "./storage.js";
+import { kvGet, kvSet, kvDelete } from "../core/storage.js";
 
 // One identity per Google account, so two accounts in one browser never mix.
 const identityKey = (uid) => `device:${uid}`;

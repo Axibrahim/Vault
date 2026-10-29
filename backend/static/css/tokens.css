@@ -1,0 +1,19 @@
+/* Design tokens: fonts, colors, type families. */
+
+@font-face { font-family: "Space Grotesk"; src: url("../fonts/space-grotesk.woff2") format("woff2"); font-weight: 300 700; font-display: swap; }
+
+@font-face { font-family: "JetBrains Mono"; src: url("../fonts/jetbrains-mono.woff2") format("woff2"); font-weight: 100 800; font-display: swap; }
+
+:root {
+  --bg: #07080a;
+  --panel: rgba(16, 18, 22, 0.78);
+  --line: rgba(255, 255, 255, 0.09);
+  --text: #ece8e1;
+  --muted: #8a8f98;
+  --brass: #f0b45b;
+  --brass-d: #b9863a;
+  --ok: #5be3a0;
+  --bad: #e5584b;
+  --sans: "Space Grotesk", system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, monospace;
+}

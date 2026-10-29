@@ -1,8 +1,11 @@
 import os
 from datetime import timedelta
+from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()    # reads backend/.env file as os.environ (Does nothing if the file is missing)
+BACKEND_DIR = Path(__file__).resolve().parent.parent
+
+load_dotenv(BACKEND_DIR / ".env")    # reads backend/.env into os.environ (does nothing if the file is missing)
 
 class BaseConfig:
     DEBUG = False

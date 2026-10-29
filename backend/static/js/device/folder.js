@@ -1,4 +1,4 @@
-import { kvGet, kvSet, kvDelete } from "./storage.js";
+import { kvGet, kvSet, kvDelete } from "../core/storage.js";
 
 const folderKey = (uid) => `folder:${uid}`;
 

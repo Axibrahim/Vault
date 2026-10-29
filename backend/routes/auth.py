@@ -6,8 +6,8 @@ from firebase_admin import firestore
 from flask import Blueprint, current_app, g, jsonify, request
 from google.api_core.exceptions import AlreadyExists
 
-from extensions import limiter
-from firebase_setup import get_db
+from core.extensions import limiter
+from core.firebase_setup import get_db
 
 bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 
