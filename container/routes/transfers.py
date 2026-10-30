@@ -176,39 +176,69 @@ def answer(transfer_id):
 @limiter.limit("600 per minute")
 @login_required
 def ice(transfer_id):
-    """Passes a network address from one device to the other."""
-    data = request.get_json(silent=True) or {}
+    """Passes a signed network candidate from one enrolled device to the other."""
+    data = request.get_json(silent=True) or{}
 
     transfer_id = _uuid_or_none(transfer_id)
     device_id = _uuid_or_none(data.get("deviceId"))
+
     transfer = registry.get(g.uid, transfer_id) if transfer_id else None
-    if transfer is None:
-        return jsonify(error="Not found"), 404
+    if transfer_id is None:
+        return jsonify(error="Not Found"), 404
+
     if device_id not in (transfer["from"], transfer["to"]):
-        return jsonify(error="Device check failed"), 403
+        return jsonify (error="Device check failed"), 403
 
     candidate = data.get("candidate")
-    mid = data.get("sdpMid")
+    mid = data.get("sdpmid")
     index = data.get("sdpMLineIndex")
+
     if not isinstance(candidate, str) or len(candidate) > MAX_CANDIDATE_CHARS:
         return jsonify(error="Invalid request"), 400
+
     if mid is not None and (not isinstance(mid, str) or len(mid) > 64):
         return jsonify(error="Invalid request"), 400
-    if index is not None and (not isinstance(index, int) or isinstance(index, bool) or not 0 <= index <= 16):
+
+    if index is not None and (
+        not isinstance(index, int)
+        or isinstance(index, bool)
+        or not 0 <= index <= 16
+    ):
         return jsonify(error="Invalid request"), 400
+
+    # Sign in te candidate and its metadata, not just the transfer ID.
+    candidate_hash = _sha256_hex(candidate)
+    signed_mid = mid or ""
+    signed_index = str(index) if index is not None else ""
+
+    proof = verify_device_proof(
+        _user_ref(),
+        g.uid,
+        data,
+        "ice",
+        [transfer_id, candidate_hash, signed_mid, signed_index],
+        device_types=("desktop", "phone")
+    )
+
+    if proof is None:
+        return jsonify(error="Device check failed"), 403
 
     if not registry.note_ice(g.uid, transfer_id, MAX_ICE_PER_TRANSFER):
         return jsonify(error="Too many messages"), 429
 
     peer = transfer["to"] if device_id == transfer["from"] else transfer["from"]
+
     hub.publish(g.uid, peer, {
         "type": "ice",
         "transferId": transfer_id,
         "candidate": candidate,
         "sdpMid": mid,
-        "sdpMLineIndex": index,
+        "sdpMLineIndex": index
     })
+
     return jsonify(status="ok")
+    
+    
 
 
 @bp.post("/<transfer_id>/close")
@@ -219,18 +249,40 @@ def close(transfer_id):
 
     transfer_id = _uuid_or_none(transfer_id)
     device_id = _uuid_or_none(data.get("deviceId"))
+
     transfer = registry.get(g.uid, transfer_id) if transfer_id else None
     if transfer is None:
         return jsonify(error="Not found"), 404
+
     if device_id not in (transfer["from"], transfer["to"]):
         return jsonify(error="Device check failed"), 403
 
-    reason = data.get("reason")
-    reason = reason if reason in CLOSE_REASONS else "done"
+    reason = data.get("reason", "done")
+    if reason not in CLOSE_REASONS:
+        return jsonify(error="Invalid close reason"), 400
+
+    # The signature binds the device to this exact transfer and close reason.
+    proof = verify_device_proof(
+        _user_ref(),
+        g.uid,
+        data,
+        "close",
+        [transfer_id, reason],
+        device_types=("desktop", "phone"),
+    )
+
+    if proof is None:
+        return jsonify(error="Device check failed"), 403
 
     peer = transfer["to"] if device_id == transfer["from"] else transfer["from"]
+
     registry.remove(g.uid, transfer_id)
-    hub.publish(g.uid, peer, {"type": "closed", "transferId": transfer_id, "reason": reason})
+    hub.publish(g.uid, peer, {
+        "type": "closed",
+        "transferId": transfer_id,
+        "reason": reason,
+    })
+
     return jsonify(status="ok")
 
 
