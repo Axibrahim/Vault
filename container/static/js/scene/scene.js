@@ -21,6 +21,8 @@ let renderer, scene, camera, rig, rings, bolts, core, coreMat, dust, light;
 const cur = { spin: 0.12, bolts: 0, open: 0, core: 0.35, zoom: 9 };
 const color = new THREE.Color(0xf0b45b);
 const mouse = { x: 0, y: 0 };
+const ease = (a, b, k) => a + (b - a) * k;
+let last = performance.now();
 
 try {
   const phone = Math.min(innerWidth, innerHeight) < 600;
@@ -94,6 +96,7 @@ try {
   still ? frame(0) : loop();
 } catch (err) {
   document.documentElement.classList.add("no-webgl"); // the CSS gradient background still looks fine
+  console.warn("Vault 3D scene disabled:", err);
 }
 
 function fit() {
@@ -113,8 +116,6 @@ function fit() {
   if (still) frame(0);
 }
 
-const ease = (a, b, k) => a + (b - a) * k;
-let last = performance.now();
 
 function frame(dt) {
   const k = Math.min(1, dt * 2.2 || 1);
