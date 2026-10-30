@@ -1,4 +1,5 @@
 from flask import Flask, jsonify, render_template
+import mimetypes
 from werkzeug.exceptions import HTTPException
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -7,6 +8,9 @@ from core.extensions import limiter
 from core.firebase_setup import init_firebase
 from core.security import register_security
 from routes import auth, devices, pairing, transfers
+
+mimetypes.add_type("application/manifest+json", ".webmanifest")
+
 
 
 def create_app():

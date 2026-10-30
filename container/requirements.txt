@@ -1,3 +1,4 @@
+a2wsgi==1.10.10
 anyio==4.15.1
 blinker==1.9.0
 CacheControl==0.14.4
@@ -45,6 +46,7 @@ python-dotenv==1.2.4
 requests==2.34.2
 typing_extensions==4.16.0
 urllib3==2.8.0
+uvicorn==0.54.0
 Werkzeug==3.1.9
 wrapt==2.5.1
 gunicorn==23.0.0

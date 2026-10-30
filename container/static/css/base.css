@@ -4,7 +4,9 @@
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
-html, body { overflow-x: hidden; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+
+html, body { overflow-x: hidden; overscroll-behavior-y: none; }
 
 button, input { touch-action: manipulation; }
 

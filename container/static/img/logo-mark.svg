@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Vault">
+  <circle cx="32" cy="32" r="26" fill="none" stroke="#3a3f48" stroke-width="5.5"/>
+  <line x1="56.02" y1="41.95" x2="60.64" y2="43.86" stroke="#3a3f48" stroke-width="4"/>
+  <line x1="41.95" y1="56.02" x2="43.86" y2="60.64" stroke="#3a3f48" stroke-width="4"/>
+  <line x1="22.05" y1="56.02" x2="20.14" y2="60.64" stroke="#3a3f48" stroke-width="4"/>
+  <line x1="7.98" y1="41.95" x2="3.36" y2="43.86" stroke="#3a3f48" stroke-width="4"/>
+  <line x1="7.98" y1="22.05" x2="3.36" y2="20.14" stroke="#3a3f48" stroke-width="4"/>
+  <line x1="22.05" y1="7.98" x2="20.14" y2="3.36" stroke="#3a3f48" stroke-width="4"/>
+  <line x1="41.95" y1="7.98" x2="43.86" y2="3.36" stroke="#3a3f48" stroke-width="4"/>
+  <line x1="56.02" y1="22.05" x2="60.64" y2="20.14" stroke="#3a3f48" stroke-width="4"/>
+  <circle cx="32" cy="32" r="19" fill="none" stroke="#f0b45b" stroke-width="2.6"/>
+  <circle cx="32" cy="32" r="14" fill="#111419"/>
+  <polygon points="39.36,36.25 32.00,40.50 24.64,36.25 24.64,27.75 32.00,23.50 39.36,27.75" fill="none" stroke="#f0b45b" stroke-width="1.5"/>
+  <circle cx="32" cy="32" r="3" fill="#f0b45b"/>
+</svg>

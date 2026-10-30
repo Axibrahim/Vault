@@ -8,9 +8,7 @@
 
 .brand { display: flex; align-items: center; gap: 12px; font-weight: 700; letter-spacing: 0.32em; font-size: 0.9rem; }
 
-.mark { width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--brass); position: relative; }
-
-.mark::after { content: ""; position: absolute; inset: 4px; border-radius: 50%; background: var(--brass); }
+.logo { display: block; width: 28px; height: 28px; }
 
 .chip { display: flex; align-items: center; gap: 8px; font: 500 0.7rem var(--mono); color: var(--muted); letter-spacing: 0.04em; }
 

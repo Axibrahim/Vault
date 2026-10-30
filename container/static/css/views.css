@@ -1,3 +1,43 @@
+/* ---------- screens: sign in, setup steps, receiving cards, device list ---------- */
+
+.facts { list-style: none; padding: 0; margin: 28px 0 0; display: grid; gap: 10px; font: 500 0.78rem var(--mono); color: var(--muted); }
+
+.facts li { display: flex; align-items: center; gap: 10px; }
+
+.ico { flex: none; fill: none; stroke: var(--brass); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+
+.userbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 26px; padding-bottom: 16px; border-bottom: 1px solid var(--line); font-size: 0.8rem; color: var(--muted); }
+
+.userbar strong { color: var(--text); font-weight: 500; word-break: break-all; }
+
+.steps { list-style: none; padding: 0; margin: 0 0 8px; display: flex; gap: 8px; font: 500 0.72rem var(--mono); color: var(--muted); }
+
+.steps li { flex: 1; display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; }
+
+.steps span { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--muted); font-size: 0.65rem; }
+
+.steps li[data-done="true"] { color: var(--text); border-color: var(--brass-d); }
+
+.steps li[data-done="true"] span { background: var(--brass); border-color: var(--brass); color: #1a1205; }
+
+.meta { margin: 18px 0 22px; display: grid; gap: 12px; }
+
+.meta div { padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: rgba(0, 0, 0, 0.28); }
+
+.meta dt { font: 500 0.68rem var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+
+.meta dd { margin: 4px 0 0; overflow-wrap: anywhere; }
+
+.soon { display: flex; justify-content: space-between; align-items: center; margin: 18px 0 4px; padding: 14px 16px; border: 1px dashed var(--line); border-radius: 12px; color: var(--muted); }
+
+.soon em { font: 600 0.68rem var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--brass); }
+
+.devices { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+
+.devices li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; }
+
+.devices .danger { min-height: 40px; padding: 0.4rem 0.9rem; font-size: 0.8rem; }
+
 /* ---------- keep me signed in, pairing, transfer messages ---------- */
 
 .check { display: flex; align-items: center; gap: 10px; margin: 18px 0 6px; font: 500 0.78rem var(--mono); letter-spacing: 0.04em; text-transform: none; color: var(--text); cursor: pointer; }

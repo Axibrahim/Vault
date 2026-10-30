@@ -5,8 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="color-scheme" content="dark">
   <meta name="theme-color" content="#07080A">
+  <meta name="description" content="Vault: send photos and videos between your phone and your PC.">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Vault">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Vault</title>
-  <link rel="icon" href="data:,">
+  <link rel="icon" href="{{ url_for('static', filename='img/favicon.svg') }}" type="image/svg+xml">
+  <link rel="icon" href="{{ url_for('static', filename='img/favicon.ico') }}" sizes="any">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='img/apple-touch-icon.png') }}">
+  <link rel="manifest" href="{{ url_for('static', filename='manifest.webmanifest') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/tokens.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/components.css') }}">
@@ -18,14 +26,12 @@
   <div class="vignette" aria-hidden="true"></div>
 
   <header class="top">
-    <div class="brand"><span class="mark" aria-hidden="true"></span>VAULT</div>
+    <div class="brand"><img class="logo" src="{{ url_for('static', filename='img/logo-mark.svg') }}" alt="" width="28" height="28">VAULT</div>
     <div class="chip"><i aria-hidden="true"></i>Device key never leaves this browser</div>
   </header>
-
-  <main>
+    <p id="status" class="toast" role="status" aria-live="polite">Loading...</p>
+    <main>
     <section class="panel">
-      <p id="status" class="toast" role="status" aria-live="polite">Loading...</p>
-
       <section id="login-view" hidden>
         <p class="eyebrow">Private transfer</p>
         <h1>A locked door between your phone and your PC.</h1>
@@ -37,9 +43,9 @@
         <label class="check"><input id="remember" type="checkbox"> Keep me signed in on this device</label>
         <p class="hint">Only tick this on a device that is yours. It lasts up to 14 days, and removing devices still asks you to sign in again.</p>
         <ul class="facts">
-          <li>Non-exportable device key</li>
-          <li>One receiving folder you choose</li>
-          <li>Session kept in a secure cookie</li>
+          <li><svg class="ico" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M11.3 11.7 20 3M16 7l3 3M8 11a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/></svg>Non-exportable device key</li>
+          <li><svg class="ico" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>One receiving folder you choose</li>
+          <li><svg class="ico" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6zM9 12l2 2 4-4"/></svg>Session kept in a secure cookie</li>
         </ul>
       </section>
 
