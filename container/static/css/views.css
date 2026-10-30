@@ -1,37 +1,37 @@
-/* Screen-specific blocks: sign in, setup steps, receiving cards, device list. */
+/* ---------- keep me signed in, pairing, transfer messages ---------- */
 
-.facts { list-style: none; padding: 0; margin: 28px 0 0; display: grid; gap: 10px; font: 500 0.78rem var(--mono); color: var(--muted); }
+.check { display: flex; align-items: center; gap: 10px; margin: 18px 0 6px; font: 500 0.78rem var(--mono); letter-spacing: 0.04em; text-transform: none; color: var(--text); cursor: pointer; }
 
-.facts li::before { content: "▸ "; color: var(--brass); }
+.check input { width: 18px; height: 18px; min-height: 0; padding: 0; accent-color: var(--brass); }
 
-.userbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 26px; padding-bottom: 16px; border-bottom: 1px solid var(--line); font-size: 0.8rem; color: var(--muted); }
+.hint { margin: 4px 0 0; font-size: 0.8rem; color: var(--muted); }
 
-.userbar strong { color: var(--text); font-weight: 500; word-break: break-all; }
+.userbtns { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 
-.steps { list-style: none; padding: 0; margin: 0 0 8px; display: flex; gap: 8px; font: 500 0.72rem var(--mono); color: var(--muted); }
+.pairbox { margin: 18px 0; padding: 16px; border: 1px dashed var(--brass-d); border-radius: 12px; background: rgba(0, 0, 0, 0.28); }
 
-.steps li { flex: 1; display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; }
+.pairbox .lead { margin-bottom: 8px; }
 
-.steps span { display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--muted); font-size: 0.65rem; }
+.code { margin: 8px 0; font: 600 2rem var(--mono); letter-spacing: 0.3em; color: var(--brass); overflow-wrap: anywhere; }
 
-.steps li[data-done="true"] { color: var(--text); border-color: var(--brass-d); }
+.code.small { font-size: 1.1rem; letter-spacing: 0.18em; }
 
-.steps li[data-done="true"] span { background: var(--brass); border-color: var(--brass); color: #1a1205; }
+.code-input { font: 600 1.2rem var(--mono); letter-spacing: 0.3em; text-transform: uppercase; }
 
-.meta { margin: 18px 0 22px; display: grid; gap: 12px; }
+.transfer { display: grid; gap: 10px; margin-top: 18px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: rgba(0, 0, 0, 0.28); }
 
-.meta div { padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: rgba(0, 0, 0, 0.28); }
+.transfer-text { display: grid; gap: 2px; }
 
-.meta dt { font: 500 0.68rem var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+.transfer-text span { font-size: 0.85rem; color: var(--muted); }
 
-.meta dd { margin: 4px 0 0; overflow-wrap: anywhere; }
+.bar { height: 4px; border-radius: 2px; background: var(--line); overflow: hidden; }
 
-.soon { display: flex; justify-content: space-between; align-items: center; margin: 18px 0 4px; padding: 14px 16px; border: 1px dashed var(--line); border-radius: 12px; color: var(--muted); }
+.bar i { display: block; width: 0; height: 100%; background: var(--brass); transition: width 0.2s ease; }
 
-.soon em { font: 600 0.68rem var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--brass); }
+.transfer[data-state="received"] { border-color: var(--ok); }
 
-.devices { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.transfer[data-state="received"] .bar i { width: 100%; background: var(--ok); }
 
-.devices li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; }
+.transfer[data-state="interrupted"] { border-color: var(--bad); }
 
-.devices .danger { min-height: 40px; padding: 0.4rem 0.9rem; font-size: 0.8rem; }
+.transfer[data-state="interrupted"] .bar i { background: var(--bad); }

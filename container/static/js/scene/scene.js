@@ -6,6 +6,8 @@ const STATES = {
   enroll:  { spin: 0.45, bolts: 0,   open: 0, core: 0.8,  color: 0xf0b45b, zoom: 8.2 },
   desktop: { spin: 0.18, bolts: 0.7, open: 1, core: 1.0,  color: 0x5be3a0, zoom: 7.6 },
   other:   { spin: 0.05, bolts: 0,   open: 0, core: 0.25, color: 0xe5584b, zoom: 9.0 },
+  pair:    { spin: 0.45, bolts: 0.3, open: 0, core: 0.8,  color: 0xf0b45b, zoom: 8.2 },
+  phone:   { spin: 0.18, bolts: 0.7, open: 1, core: 1.0,  color: 0x5be3a0, zoom: 7.6 },
 };
 
 let target = STATES.login;

@@ -4,9 +4,11 @@ import { api } from "./core/api.js";
 import { getDeviceIdentity } from "./device/identity.js";
 import { state } from "./state.js";
 import { $, setStatus, show } from "./ui/dom.js";
-import { initLogin } from "./views/login.js";
+import { initLogin, showLoginOptions } from "./views/login.js";
 import { showEnroll, initEnroll } from "./views/enroll.js";
 import { showDesktop, initDesktop } from "./views/desktop.js";
+import { showPair, initPair } from "./views/pair.js";
+import { showPhone, initPhone } from "./views/phone.js";
 import { showOther } from "./views/other.js";
 
 async function start() {
@@ -16,6 +18,7 @@ async function start() {
   } catch (err) {
     if (err.status === 401) {
       setStatus("Please sign in");
+      showLoginOptions();
       show("login");
       prepareAuth().catch(() => setStatus("Could not load sign-in"));
     } else {
@@ -38,12 +41,16 @@ async function start() {
 async function route() {
   const { accountState, devices } = await api("GET", "/api/devices");
   const identity = await getDeviceIdentity(state.uid);
-  const mine = identity && devices.some((d) => d.id === identity.deviceId && d.status === "active");
+  const mine = identity && devices.find((d) => d.id === identity.deviceId && d.status === "active");
 
-  if (mine) {
-    await showDesktop(identity);
+  if (mine && mine.type === "desktop") {
+    await showDesktop(identity, devices);
+  } else if (mine && mine.type === "phone") {
+    showPhone(identity);
   } else if (accountState === "no_devices") {
     showEnroll();
+  } else if (accountState === "desktop_enrolled") {
+    showPair();
   } else {
     showOther(devices, start);
   }
@@ -52,4 +59,6 @@ async function route() {
 initLogin(start);
 initEnroll(start);
 initDesktop(start);
+initPair(start);
+initPhone(start);
 start();

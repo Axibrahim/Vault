@@ -11,10 +11,15 @@ from core.firebase_setup import get_db
 
 bp = Blueprint("auth", __name__, url_prefix="/api/auth")
 
-def _fail(message, status):
-    resp = jsonify(error=message)
+
+def _fail(message, status, code=None):
+    body = {"error": message}
+    if code:
+        body["code"] = code
+    resp = jsonify(body)
     resp.status_code = status
     return resp
+
 
 def _clear_cookie(resp):
     cfg = current_app.config
@@ -23,9 +28,10 @@ def _clear_cookie(resp):
         path="/",
         secure=cfg["AUTH_COOKIE_SECURE"],
         httponly=True,
-        samesite=cfg["AUTH_COOKIE_SAMESITE"]
+        samesite=cfg["AUTH_COOKIE_SAMESITE"],
     )
     return resp
+
 
 def login_required(view):
     @wraps(view)
@@ -35,7 +41,7 @@ def login_required(view):
             return _fail("Not authenticated", 401)
 
         try:
-            # check_revoked = true asks firebase whether this session was revoked
+            # check_revoked=True asks Firebase whether this session was revoked.
             claims = fb_auth.verify_session_cookie(cookie, check_revoked=True)
         except Exception as e:
             current_app.logger.info("session rejected: %s", type(e).__name__)
@@ -43,15 +49,34 @@ def login_required(view):
 
         g.uid = claims["uid"]
         g.email = claims.get("email")
+        g.auth_time = claims.get("auth_time", 0)   # when the Google sign-in really happened
         return view(*args, **kwargs)
 
     return wrapper
 
 
+def fresh_login_required(view):
+    """Like login_required, but the Google sign-in itself must be recent.
+
+    A remembered session can live for 14 days. Sensitive actions (pairing,
+    removing devices) still ask for a recent sign-in, so a stolen or forgotten
+    session cannot be used to take over the account's devices.
+    """
+
+    @wraps(view)
+    def wrapper(*args, **kwargs):
+        age = time.time() - g.auth_time
+        if age > current_app.config["SENSITIVE_MAX_AGE_SECONDS"]:
+            return _fail("Please sign in again to continue", 401, code="reauth_required")
+        return view(*args, **kwargs)
+
+    return login_required(wrapper)
+
+
 def _ensure_user(decoded):
     ref = get_db().collection("users").document(decoded["uid"])
     try:
-        # create() fails if the document already exists, so this is atomic
+        # create() fails if the document already exists, so this is atomic.
         ref.create({
             "email": decoded.get("email"),
             "account_state": "no_devices",
@@ -81,14 +106,14 @@ def login():
     if not isinstance(id_token, str) or not 20 <= len(id_token) <= 4096:
         return _fail("Invalid request", 400)
 
-    # 1) verify signature, expiry, audiance and revokation.
+    # 1) Verify signature, expiry, audience and revocation.
     try:
         decoded = fb_auth.verify_id_token(id_token, check_revoked=True)
     except Exception as e:
         current_app.logger.warning("login rejected: %s", type(e).__name__)
         return _fail("Authentication failed", 401)
 
-    # 2) our own rules on top of firebase's
+    # 2) Our own rules on top of Firebase's.
     if decoded.get("firebase", {}).get("sign_in_provider") != "google.com":
         return _fail("Authentication failed", 401)
     if decoded.get("email_verified") is not True:
@@ -96,29 +121,33 @@ def login():
     if time.time() - decoded.get("auth_time", 0) > current_app.config["LOGIN_MAX_AGE_SECONDS"]:
         return _fail("Authentication failed", 401)
 
-    # 3) swap the short-lived ID token for a longer-lived session token
-    duration = current_app.config["AUTH_SESSION_DURATION"]
+    # 3) Swap the short-lived ID token for a longer-lived session cookie.
+    cfg = current_app.config
+    remember = data.get("remember") is True
+    duration = cfg["AUTH_REMEMBER_DURATION"] if remember else cfg["AUTH_SESSION_DURATION"]
     try:
         session_cookie = fb_auth.create_session_cookie(id_token, expires_in=duration)
     except Exception as e:
-        current_app.logger.warning("session cookie failed: %s", type(e). __name__)
+        current_app.logger.warning("session cookie failed: %s", type(e).__name__)
         return _fail("Authentication failed", 401)
 
-    # 4) make sure the user have a recordin the db
+    # 4) Make sure the user has a record in our database.
     _ensure_user(decoded)
 
-    resp = jsonify(status="ok", email=decoded.get("email"))
-    cfg = current_app.config
+    resp = jsonify(status="ok", email=decoded.get("email"), remember=remember)
     resp.set_cookie(
         cfg["AUTH_COOKIE_NAME"],
         session_cookie,
-        max_age=int(duration.total_seconds()),
+        # Remembered: a persistent cookie. Not remembered: a browser-session cookie
+        # that disappears when the browser closes (the server still expires it in 8h).
+        max_age=int(duration.total_seconds()) if remember else None,
         secure=cfg["AUTH_COOKIE_SECURE"],
         httponly=True,
         samesite=cfg["AUTH_COOKIE_SAMESITE"],
         path="/",
     )
     return resp
+
 
 @bp.get("/me")
 @login_required
@@ -134,8 +163,6 @@ def logout():
 @bp.post("/logout-all")
 @login_required
 def logout_all():
-    # invalidates every ssession and refresh token this user has, on every single device
+    # Invalidates every session and refresh token this user has, on every device.
     fb_auth.revoke_refresh_tokens(g.uid)
     return _clear_cookie(jsonify(status="ok"))
-
-                                   

@@ -6,7 +6,7 @@ from core.config import get_config
 from core.extensions import limiter
 from core.firebase_setup import init_firebase
 from core.security import register_security
-from routes import auth, devices
+from routes import auth, devices, pairing, transfers
 
 
 def create_app():
@@ -16,13 +16,19 @@ def create_app():
     hops = app.config["PROXY_HOPS"]
     if hops:
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=hops, x_proto=hops, x_host=hops)
+    elif app.config["ENFORCE_HTTPS"]:
+        app.logger.warning(
+            "Production mode with PROXY_HOPS=0. Behind a hosting platform's proxy "
+            "set PROXY_HOPS=1, otherwise every request is redirected forever."
+        )
 
     register_security(app)
     init_firebase(app)
     limiter.init_app(app)
     app.register_blueprint(auth.bp)
     app.register_blueprint(devices.bp)
-
+    app.register_blueprint(pairing.bp)
+    app.register_blueprint(transfers.bp)
 
     @app.get("/")
     def index():

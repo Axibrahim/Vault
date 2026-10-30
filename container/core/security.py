@@ -32,6 +32,8 @@ def register_security(app):
 
     @app.before_request
     def enforce_https():
+        if request.path == "/api/health":
+            return None    # the hosting platform checks this over plain http
         if app.config["ENFORCE_HTTPS"] and not request.is_secure:
             return redirect(request.url.replace("http://", "https://", 1), code=308)
 

@@ -1,4 +1,5 @@
 import { api } from "../core/api.js";
+import { withReauth } from "../core/auth.js";
 import { createDeviceIdentity, forgetDeviceIdentity } from "../device/identity.js";
 import { folderSupported, pickFolder } from "../device/folder.js";
 import { state } from "../state.js";
@@ -44,11 +45,13 @@ export function initEnroll(refresh) {
     setStatus("Setting up...");
     try {
       created = await createDeviceIdentity(state.uid, name);
-      await api("POST", "/api/devices/enroll-desktop", {
-        deviceId: created.identity.deviceId,
-        name,
-        publicKey: created.publicJwk,
-      });
+      await withReauth(() =>
+        api("POST", "/api/devices/enroll-desktop", {
+          deviceId: created.identity.deviceId,
+          name,
+          publicKey: created.publicJwk,
+        })
+      );
     } catch (err) {
       if (created) await forgetDeviceIdentity(state.uid);
       setStatus(err.status === 409 ? "This account already has a computer set up" : "Setup failed");

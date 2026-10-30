@@ -6,10 +6,12 @@ from cryptography.hazmat.primitives.asymmetric import ec
 from firebase_admin import firestore
 from flask import Blueprint, g, jsonify, request
 from google.api_core.exceptions import AlreadyExists
+from google.cloud.firestore_v1.base_query import FieldFilter
 
+from core.deviceauth import make_challenge
 from core.extensions import limiter
 from core.firebase_setup import get_db
-from routes.auth import login_required
+from routes.auth import fresh_login_required, login_required
 
 bp = Blueprint("devices", __name__, url_prefix="/api/devices")
 
@@ -30,7 +32,7 @@ def _b64url_to_int(value):
     return int.from_bytes(raw, "big")
 
 
-def _clean_public_jwk(jwk):
+def clean_public_jwk(jwk):
     """Return a minimal, verified P-256 public key, or None if anything is off."""
     if not isinstance(jwk, dict):
         return None
@@ -83,6 +85,18 @@ def _revoke_in_txn(transaction, user_ref, device_ref):
     })
     if device.get("type") == "desktop":
         transaction.update(user_ref, {"account_state": "no_devices"})
+    elif device.get("type") == "phone":
+        transaction.update(user_ref, {"account_state": "desktop_enrolled"})
+
+    return device.get("type")
+
+
+def _revoke_active_phones(user_ref):
+    """When the computer is removed, the phones it vouched for are removed too."""
+    phones = user_ref.collection("devices").where(filter=FieldFilter("type", "==", "phone")).stream()
+    for doc in phones:
+        if doc.to_dict().get("status") == "active":
+            doc.reference.update({"status": "revoked", "revoked_at": firestore.SERVER_TIMESTAMP})
 
 
 @bp.get("")
@@ -105,9 +119,17 @@ def list_devices():
     return jsonify(accountState=state, devices=devices)
 
 
+@bp.post("/challenge")
+@limiter.limit("60 per minute")
+@login_required
+def challenge():
+    """A fresh value that a device signs to prove it holds its private key."""
+    return jsonify(challenge=make_challenge(g.uid))
+
+
 @bp.post("/enroll-desktop")
 @limiter.limit("10 per hour")
-@login_required
+@fresh_login_required
 def enroll_desktop():
     data = request.get_json(silent=True) or {}
 
@@ -121,7 +143,7 @@ def enroll_desktop():
     except ValueError:
         return jsonify(error="Invalid request"), 400
 
-    public_key = _clean_public_jwk(data.get("publicKey"))
+    public_key = clean_public_jwk(data.get("publicKey"))
     if public_key is None:
         return jsonify(error="Invalid public key"), 400
 
@@ -149,7 +171,7 @@ def enroll_desktop():
 
 @bp.post("/<device_id>/revoke")
 @limiter.limit("10 per hour")
-@login_required
+@fresh_login_required
 def revoke_device(device_id):
     try:
         device_id = str(uuid.UUID(device_id))
@@ -161,8 +183,11 @@ def revoke_device(device_id):
     device_ref = user_ref.collection("devices").document(device_id)
 
     try:
-        _revoke_in_txn(db.transaction(), user_ref, device_ref)
+        revoked_type = _revoke_in_txn(db.transaction(), user_ref, device_ref)
     except DeviceNotFound:
         return jsonify(error="Not found"), 404
+
+    if revoked_type == "desktop":
+        _revoke_active_phones(user_ref)
 
     return jsonify(status="ok")

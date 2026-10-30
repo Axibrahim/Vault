@@ -1,46 +1,7 @@
 # Vault
 
-A web app for sending photos and videos between your phone and your PC.
-Work in progress: sign-in with Google and computer setup are done; the phone-to-PC transfer is next.
+A web app for sending photos, videos and documents between your phone and your PC.
+Done: Google sign-in, computer setup, phone pairing, and the server side of device-to-device transfers.
+Next: the transfer engine in the browser (chunked, resumable, large files).
 
 ## Project structure
-
-```
-container/
-├── app.py                  creates the Flask app
-├── core/                   shared plumbing
-│   ├── config.py           settings, read from container/.env
-│   ├── extensions.py       rate limiter
-│   ├── firebase_setup.py   Firebase / Firestore connection
-│   └── security.py         CSP, HTTPS, CSRF and security headers
-├── routes/                 API endpoints
-│   ├── auth.py             /api/auth/*
-│   └── devices.py          /api/devices/*
-└── static/                 all frontend code
-    ├── templates/          the single HTML page (never served as a raw file)
-    ├── css/                tokens, base, components, views, responsive
-    ├── fonts/              self-hosted fonts
-    ├── vendor/             Three.js (self-hosted, the CSP blocks CDNs)
-    └── js/
-        ├── main.js         entry point: picks which screen to show
-        ├── state.js        shared state
-        ├── core/           api, auth, storage
-        ├── device/         device key and receiving folder
-        ├── ui/             DOM helpers
-        ├── views/          login, enroll, desktop, other
-        └── scene/          3D vault door
-```
-
-## Run locally
-
-```bash
-cd container
-python -m venv venv
-venv\Scripts\activate           # Windows (macOS/Linux: source venv/bin/activate)
-pip install -r requirements.txt
-copy .env.example .env          # then fill in the values
-python app.py                   # http://127.0.0.1:5000
-```
-
-Put your Firebase service account key at `container/serviceAccountKey.json` (it is git-ignored).
-Production start command: `gunicorn app:app` (run from `container/`).
