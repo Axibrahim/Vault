@@ -3,9 +3,9 @@ from datetime import timedelta
 from pathlib import Path
 from dotenv import load_dotenv
 
-BACKEND_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent
 
-load_dotenv(BACKEND_DIR / ".env")    # reads backend/.env into os.environ (does nothing if the file is missing)
+load_dotenv(BASE_DIR / ".env")    # reads container/.env into os.environ (does nothing if the file is missing)
 
 class BaseConfig:
     DEBUG = False
@@ -64,7 +64,7 @@ def get_config():
 
     missing = [name for name in REQUIRED if not getattr(cfg, name)]
     if missing:
-        raise RuntimeError("Missing setting in backend/.env: " + ", ".join(missing))
+        raise RuntimeError("Missing setting in container/.env: " + ", ".join(missing))
 
     if len(cfg.SECRET_KEY) < 32:
         raise RuntimeError("SECRET_KEY must be at least 32 characters long." \

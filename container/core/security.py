@@ -25,6 +25,12 @@ def register_security(app):
     csp = build_csp(app.config["FIREBASE_AUTH_DOMAIN"])
 
     @app.before_request
+    def hide_templates():
+        # page templates live in static/ but must never be downloadable as raw files
+        if request.path.startswith("/static/templates"):
+            return jsonify(error="Not Found"), 404
+
+    @app.before_request
     def enforce_https():
         if app.config["ENFORCE_HTTPS"] and not request.is_secure:
             return redirect(request.url.replace("http://", "https://", 1), code=308)

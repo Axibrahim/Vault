@@ -6,7 +6,7 @@ from firebase_admin import credentials, firestore
 def init_firebase(app):
     path = app.config["FIREBASE_CREDENTIALS_FILE"]
     if not os.path.isabs(path):
-        # relative paths are resolved from the backend/ folder
+        # relative paths are resolved from the container/ folder
         path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), path)
 
     if not os.path.isfile(path):

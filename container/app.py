@@ -10,7 +10,7 @@ from routes import auth, devices
 
 
 def create_app():
-    app = Flask(__name__)
+    app = Flask(__name__, template_folder="static/templates")
     app.config.from_object(get_config())
 
     hops = app.config["PROXY_HOPS"]
