@@ -6,18 +6,18 @@ Work in progress: sign-in with Google and computer setup are done; the phone-to-
 ## Project structure
 
 ```
-backend/
+container/
 ├── app.py                  creates the Flask app
 ├── core/                   shared plumbing
-│   ├── config.py           settings, read from backend/.env
+│   ├── config.py           settings, read from container/.env
 │   ├── extensions.py       rate limiter
 │   ├── firebase_setup.py   Firebase / Firestore connection
 │   └── security.py         CSP, HTTPS, CSRF and security headers
 ├── routes/                 API endpoints
 │   ├── auth.py             /api/auth/*
 │   └── devices.py          /api/devices/*
-├── templates/index.html    the single page
-└── static/
+└── static/                 all frontend code
+    ├── templates/          the single HTML page (never served as a raw file)
     ├── css/                tokens, base, components, views, responsive
     ├── fonts/              self-hosted fonts
     ├── vendor/             Three.js (self-hosted, the CSP blocks CDNs)
@@ -34,13 +34,13 @@ backend/
 ## Run locally
 
 ```bash
-cd backend
-python -m venv .venv
-.venv\Scripts\activate          # Windows (macOS/Linux: source .venv/bin/activate)
+cd container
+python -m venv venv
+venv\Scripts\activate           # Windows (macOS/Linux: source venv/bin/activate)
 pip install -r requirements.txt
 copy .env.example .env          # then fill in the values
 python app.py                   # http://127.0.0.1:5000
 ```
 
-Put your Firebase service account key at `backend/serviceAccountKey.json` (it is git-ignored).
-Production start command: `gunicorn app:app` (run from `backend/`).
+Put your Firebase service account key at `container/serviceAccountKey.json` (it is git-ignored).
+Production start command: `gunicorn app:app` (run from `container/`).
