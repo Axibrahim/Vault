@@ -10,8 +10,63 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  tests:
+    name: Tests and coverage
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: container
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: container/.python-version
+          cache: pip
+          cache-dependency-path: |
+            container/requirements.txt
+            container/requirements-dev.txt
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Run pytest (fails below 100% coverage, see .coveragerc)
+        run: pytest --cov --cov-report=term-missing --cov-report=xml --junitxml=pytest-report.xml
+
+      - name: Show coverage in the job summary
+        if: always()
+        run: coverage report --format=markdown >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage and test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            container/coverage.xml
+            container/pytest-report.xml
+
+      - name: Set up Node (for the browser-code tests)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Test the browser routing logic
+        run: node --test "tests/js/*.test.mjs"
+
   quality-and-security:
+    name: Lint and security
     runs-on: ubuntu-latest
 
     steps:
@@ -23,7 +78,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version-file: container/.python-version
           cache: pip
           cache-dependency-path: container/requirements.txt
 
@@ -40,7 +95,7 @@ jobs:
         run: ruff check container
 
       - name: Static security analysis
-        run: bandit -r container -ll
+        run: bandit -r container --exclude container/tests -ll
 
       - name: Audit dependencies
         run: pip-audit -r container/requirements.txt

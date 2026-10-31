@@ -17,3 +17,9 @@ __pycache__/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# tests and coverage
+.coverage
+coverage.xml
+pytest-report.xml
+.pytest_cache/

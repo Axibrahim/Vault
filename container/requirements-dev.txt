@@ -1,0 +1,5 @@
+# Everything needed to run the tests:  pip install -r requirements-dev.txt
+-r requirements.txt
+pytest==9.2.0
+pytest-cov==7.1.0
+coverage==7.17.0

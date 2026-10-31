@@ -1,0 +1,6 @@
+# Explicit rule set, so CI does not change behaviour when a new ruff version widens its defaults.
+line-length = 120
+target-version = "py312"
+
+[lint]
+select = ["E4", "E7", "E9", "F"]   # syntax errors, undefined names, unused imports/variables

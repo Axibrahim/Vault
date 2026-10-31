@@ -177,20 +177,20 @@ def answer(transfer_id):
 @login_required
 def ice(transfer_id):
     """Passes a signed network candidate from one enrolled device to the other."""
-    data = request.get_json(silent=True) or{}
+    data = request.get_json(silent=True) or {}
 
     transfer_id = _uuid_or_none(transfer_id)
     device_id = _uuid_or_none(data.get("deviceId"))
 
     transfer = registry.get(g.uid, transfer_id) if transfer_id else None
     if transfer_id is None:
-        return jsonify(error="Not Found"), 404
+        return jsonify(error="Not found"), 404
 
     if device_id not in (transfer["from"], transfer["to"]):
-        return jsonify (error="Device check failed"), 403
+        return jsonify(error="Device check failed"), 403
 
     candidate = data.get("candidate")
-    mid = data.get("sdpmid")
+    mid = data.get("sdpMid")
     index = data.get("sdpMLineIndex")
 
     if not isinstance(candidate, str) or len(candidate) > MAX_CANDIDATE_CHARS:
@@ -206,7 +206,7 @@ def ice(transfer_id):
     ):
         return jsonify(error="Invalid request"), 400
 
-    # Sign in te candidate and its metadata, not just the transfer ID.
+    # Sign in the candidate and its metadata, not just the transfer ID.
     candidate_hash = _sha256_hex(candidate)
     signed_mid = mid or ""
     signed_index = str(index) if index is not None else ""
@@ -238,8 +238,6 @@ def ice(transfer_id):
 
     return jsonify(status="ok")
     
-    
-
 
 @bp.post("/<transfer_id>/close")
 @limiter.limit("60 per minute")
