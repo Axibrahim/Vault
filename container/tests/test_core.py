@@ -3,6 +3,7 @@ import json
 import threading
 import time
 import uuid
+from pathlib import Path
 from unittest import mock
 
 import pytest
@@ -448,7 +449,9 @@ def test_relative_key_paths_are_resolved_from_the_container_folder():
     with mock.patch("core.firebase_setup.os.path.isfile", return_value=True) as isfile, \
             mock.patch("core.firebase_setup.credentials.Certificate"):
         _load_credentials(FakeApp(FIREBASE_CREDENTIALS_FILE="serviceAccountKey.json"))
-    assert isfile.call_args.args[0].endswith("container/serviceAccountKey.json")
+    path = Path(isfile.call_args.args[0])
+    assert path.name == "serviceAccountKey.json"
+    assert path.parent.name == "container"          # works with / on Linux and \\ on Windows
 
 
 def test_missing_key_file_has_a_clear_error(tmp_path):
