@@ -183,7 +183,7 @@ def ice(transfer_id):
     device_id = _uuid_or_none(data.get("deviceId"))
 
     transfer = registry.get(g.uid, transfer_id) if transfer_id else None
-    if transfer_id is None:
+    if transfer is None:
         return jsonify(error="Not found"), 404
 
     if device_id not in (transfer["from"], transfer["to"]):

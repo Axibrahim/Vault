@@ -1,0 +1,15 @@
+[run]
+branch = True
+source =
+    app
+    asgi
+    core
+    routes
+
+[report]
+show_missing = True
+fail_under = 100
+skip_covered = False
+exclude_lines =
+    pragma: no cover
+    if __name__ == .__main__.:
