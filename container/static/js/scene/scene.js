@@ -113,7 +113,7 @@ function fit() {
   } else {
     // Phones: the door sits in the top third and always fits the screen width.
     rig.scale.setScalar(Math.max(0.3, Math.min(0.62, (viewH * aspect * 0.9) / 6.6)));
-    rig.position.set(0, viewH * (h < 520 ? 0.05 : 0.3), 0);
+    rig.position.set(0, viewH * (h < 520 ? 0.05 : 0.22), 0);
   }
   if (still) frame(0);
 }
