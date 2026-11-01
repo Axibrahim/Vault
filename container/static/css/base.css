@@ -6,8 +6,8 @@
 
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 
-html, body { overflow-x: hidden; overscroll-behavior-y: none; }
-
+html, body { overflow-x: hidden; overscroll-behavior-y: none; }html { overflow-x: hidden; overscroll-behavior-y: none; }
+body { overflow-x: clip; }   /* clip stops the sideways overflow without making body a scroll box */
 button, input { touch-action: manipulation; }
 
 body {
@@ -28,6 +28,17 @@ main { position: relative; z-index: 1; min-height: 100vh; min-height: 100dvh; di
   background: var(--panel); border: 1px solid var(--line); border-radius: 20px;
   backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
   box-shadow: 0 30px 80px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+/* Desktop: a tall screen (pairing, devices) scrolls inside the panel instead of running off the window. */
+@media (min-width: 861px) {
+  .panel {
+    max-height: calc(100dvh - 160px);   /* 96px top + 64px bottom padding of <main> */
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: #3a3f48 transparent;
+  }
 }
 
 h1 { margin: 0 0 14px; font-size: clamp(1.7rem, 4vw, 2.3rem); line-height: 1.12; letter-spacing: -0.02em; }

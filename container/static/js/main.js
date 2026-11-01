@@ -12,6 +12,7 @@ import { showDesktop, initDesktop } from "./views/desktop.js";
 import { showPair, initPair } from "./views/pair.js";
 import { showPhone, initPhone } from "./views/phone.js";
 import { showOther } from "./views/other.js";
+import { initPwa } from "./ui/pwa.js";
 
 async function start() {
   let me;
@@ -72,4 +73,5 @@ initEnroll(start);
 initDesktop(start);
 initPair(start);
 initPhone(start);
+initPwa();
 start();

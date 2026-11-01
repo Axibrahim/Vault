@@ -58,6 +58,19 @@ def test_manifest_has_the_right_mime_type(api):
     response.close()
 
 
+def test_service_worker_is_served_from_the_root_scope(api):
+    response = api.get("/sw.js")
+    assert response.status_code == 200
+    assert "javascript" in response.content_type
+    assert response.headers["Service-Worker-Allowed"] == "/"
+    assert response.headers["Cache-Control"] == "no-cache"
+    response.close()
+
+
+def test_csp_allows_the_service_worker():
+    assert "worker-src 'self'" in build_csp("example.firebaseapp.com")
+
+
 def test_page_templates_cannot_be_downloaded_raw(api):
     response = api.get("/static/templates/index.html")
     assert response.status_code == 404

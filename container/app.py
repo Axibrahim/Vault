@@ -38,6 +38,15 @@ def create_app():
     def index():
         return render_template("index.html")
 
+    @app.get("/sw.js")
+    def service_worker():
+        # must be served from the site root so it can control every page,
+        # and must never be cached for long, or updates would not reach users
+        resp = app.send_static_file("sw.js")
+        resp.headers["Cache-Control"] = "no-cache"
+        resp.headers["Service-Worker-Allowed"] = "/"
+        return resp
+
     @app.get("/api/health")
     def health():
         return jsonify(status="ok")

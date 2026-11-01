@@ -43,3 +43,9 @@ def test_app_icons_in_the_manifest_exist():
     manifest = json.loads((STATIC / "manifest.webmanifest").read_text())
     missing = [i["src"] for i in manifest["icons"] if not (STATIC.parent / i["src"].lstrip("/")).is_file()]
     assert not missing, f"manifest.webmanifest references icons that are not in the repo: {missing}"
+
+
+def test_service_worker_precache_files_exist():
+    sw = (STATIC / "sw.js").read_text()
+    missing = [p for p in re.findall(r'"(/static/[^"]+)"', sw) if not (STATIC.parent / p.lstrip("/")).is_file()]
+    assert not missing, f"sw.js pre-caches files that are not in the repo: {missing}"

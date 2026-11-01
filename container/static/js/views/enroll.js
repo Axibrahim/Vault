@@ -32,7 +32,12 @@ export function initEnroll(refresh) {
       setStatus("");
     } catch (err) {
       if (err.name !== "AbortError") {
-        setStatus("Could not use that folder. Try a different one.");
+        console.error("Folder pick failed:", err);
+        setStatus(
+          err.name === "SecurityError" || err.name === "NotAllowedError"
+            ? "Chrome blocked that folder. Create a new folder (for example C:\\Vault Inbox) and choose it."
+            : "Could not use that folder. Try a different one."
+        );
       }
     }
     updateEnrollButton();
