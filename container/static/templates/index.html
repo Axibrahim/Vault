@@ -134,7 +134,11 @@
           </div>
         </div>
 
-        
+        <div id="phone-view" hidden>
+          <p class="eyebrow live"><i aria-hidden="true"></i>Paired</p>
+          <h2 id="phone-view-name"></h2>
+          <p class="lead">This device is paired with your computer.</p>
+
           <div id="phone-send" class="sendbox" hidden>
             <div class="row">
               <button id="send-photos-btn" type="button" class="btn primary">Send photos &amp; videos</button>
@@ -160,43 +164,3 @@
               <button id="save-files-btn" type="button" class="btn ghost" hidden></button>
             </div>
             <p id="received-hint" class="hint"></p>
-          </div>
-        <div id="phone-view" hidden>
-          <p class="eyebrow live"><i aria-hidden="true"></i>Paired</p>
-          <h2 id="phone-view-name"></h2>
-          <p class="lead">This device is paired with your computer.</p>
-          <div class="row">
-            <button id="remove-self-btn" type="button" class="btn danger">Remove this device</button>
-          </div>
-        </div>
-
-        <div id="other-view" hidden>
-          <p id="other-eyebrow" class="eyebrow">Another door is open</p>
-          <h2 id="other-title">Already set up elsewhere</h2>
-          <p id="other-lead" class="lead">This account is set up on another computer, or this browser's data was cleared.</p>
-          <ul id="device-list" class="devices"></ul>
-        </div>
-      </section>
-
-      <div id="install-box" class="row" hidden>
-        <button id="install-btn" type="button" class="btn ghost small" hidden>Install Vault on this device</button>
-        <p id="install-ios" class="hint" hidden>To install Vault: tap the Share button, then "Add to Home Screen".</p>
-      </div>
-
-      <div id="transfer" class="transfer" data-state="loading" role="status" aria-live="polite" hidden>
-        <div class="transfer-text">
-          <strong id="transfer-title"></strong>
-          <span id="transfer-detail"></span>
-        </div>
-        <div class="bar" aria-hidden="true"><i id="transfer-bar"></i></div>
-        <div class="row">
-          <button id="transfer-resume" type="button" class="btn ghost small" hidden>Resume</button>
-          <button id="transfer-cancel" type="button" class="btn ghost small" hidden>Cancel</button>
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <script type="module" src="{{ url_for('static', filename='js/main.js') }}"></script>
-</body>
-</html>
