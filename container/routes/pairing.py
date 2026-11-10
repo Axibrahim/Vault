@@ -147,8 +147,12 @@ def claim_pairing():
     except ValueError:
         device_id = None
 
-    if code is None or not NAME_PATTERN.fullmatch(name) or public_key is None or device_id is None:
+    if code is None:
         return jsonify(error="Invalid or expired code"), 400
+    if not NAME_PATTERN.fullmatch(name):
+        return jsonify(error="Device name can only use letters, numbers, spaces, dots, dashes and underscores"), 400
+    if public_key is None or device_id is None:
+        return jsonify(error="Invalid device details"), 400
 
     user_ref = _user_ref()
     query = user_ref.collection("pairings").where(filter=FieldFilter("code_hash", "==", _hash_code(code))).limit(1)

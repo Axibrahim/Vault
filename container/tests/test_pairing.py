@@ -116,23 +116,48 @@ def test_claim_requires_login(api, phone):
     assert api.post("/api/pairing/claim", json=claim_body(phone, "ABCDEFGH")).status_code == 401
 
 
+# CHANGED: the old single "bad input" test is now three tests, one per reason.
+
 @pytest.mark.parametrize("overrides", [
     {"code": "bad"},
     {"code": None},
-    {"name": ""},
-    {"name": "bad/name"},
-    {"name": None},
-    {"deviceId": "nope"},
-    {"deviceId": None},
-    {"publicKey": {"kty": "EC"}},
 ])
-def test_claim_rejects_bad_input(api, login, phone, overrides):
+def test_claim_rejects_a_bad_code(api, login, phone, overrides):
     login()
     body = claim_body(phone, "ABCDEFGH")
     body.update(overrides)
     response = api.post("/api/pairing/claim", json=body)
     assert response.status_code == 400
     assert response.get_json() == {"error": "Invalid or expired code"}
+
+
+@pytest.mark.parametrize("overrides", [
+    {"name": ""},
+    {"name": "bad/name"},
+    {"name": "Amr's iPhone"},
+    {"name": None},
+])
+def test_claim_explains_a_bad_device_name(api, login, phone, overrides):
+    login()
+    body = claim_body(phone, "ABCDEFGH")
+    body.update(overrides)
+    response = api.post("/api/pairing/claim", json=body)
+    assert response.status_code == 400
+    assert response.get_json()["error"].startswith("Device name can only use")
+
+
+@pytest.mark.parametrize("overrides", [
+    {"deviceId": "nope"},
+    {"deviceId": None},
+    {"publicKey": {"kty": "EC"}},
+])
+def test_claim_rejects_bad_device_details(api, login, phone, overrides):
+    login()
+    body = claim_body(phone, "ABCDEFGH")
+    body.update(overrides)
+    response = api.post("/api/pairing/claim", json=body)
+    assert response.status_code == 400
+    assert response.get_json() == {"error": "Invalid device details"}
 
 
 def test_claim_with_an_unknown_code(api, login, phone):

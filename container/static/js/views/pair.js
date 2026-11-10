@@ -70,7 +70,7 @@ export function initPair(refresh) {
       });
     } catch (err) {
       if (created) await forgetDeviceIdentity(state.uid);
-      setStatus(err.status === 400 ? "That code is invalid or has expired" : "Pairing failed");
+      setStatus(err.status === 400 ? err.message : "Pairing failed");
       return;
     }
 
