@@ -7,7 +7,6 @@ sending device's private key, so nobody who merely holds a stolen session cookie
 can pose as one of your devices.
 """
 import base64
-import base64
 import hashlib
 import hmac
 import time
