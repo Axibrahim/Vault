@@ -38,7 +38,7 @@ ordered-set==4.1.0
 packaging==26.3
 proto-plus==1.29.0
 protobuf==7.36.2
-pyasn1==0.6.4
+pyasn1==0.6.5
 pyasn1_modules==0.4.2
 pycparser==3.12
 PyJWT==2.15.1
