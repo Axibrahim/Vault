@@ -94,7 +94,11 @@
             <button id="pair-btn" type="button" class="btn primary">Pair a phone</button>
             <button id="remove-phone-btn" type="button" class="btn ghost" hidden>Remove phone</button>
           </div>
-
+          <div id="send-box" class="sendbox" hidden>
+            <button id="send-btn" type="button" class="btn primary">Send files to phone</button>
+            <input id="send-input" type="file" multiple hidden>
+            <p class="hint">Or drop files here. Photos, videos, documents and zip files all work, any size.</p>
+          </div>
           <div id="pair-box" class="pairbox" hidden>
             <p class="lead">On your phone, open Vault, sign in, and enter this code:</p>
             <p id="pair-code" class="code"></p>
@@ -130,6 +134,33 @@
           </div>
         </div>
 
+        
+          <div id="phone-send" class="sendbox" hidden>
+            <div class="row">
+              <button id="send-photos-btn" type="button" class="btn primary">Send photos &amp; videos</button>
+              <button id="send-files-btn" type="button" class="btn ghost">Send files</button>
+            </div>
+            <input id="send-photos-input" type="file" accept="image/*,video/*" multiple hidden>
+            <input id="send-files-input" type="file" multiple hidden>
+            <p class="hint">Keep this page open on both devices while files move.</p>
+          </div>
+
+          <div id="incoming" class="pairbox" hidden>
+            <p id="incoming-text" class="lead"></p>
+            <div class="row">
+              <button id="incoming-accept" type="button" class="btn primary">Accept</button>
+              <button id="incoming-decline" type="button" class="btn danger">Decline</button>
+            </div>
+          </div>
+
+          <div id="received-box" class="pairbox" hidden>
+            <p id="received-text" class="lead"></p>
+            <div class="row">
+              <button id="save-gallery-btn" type="button" class="btn primary" hidden></button>
+              <button id="save-files-btn" type="button" class="btn ghost" hidden></button>
+            </div>
+            <p id="received-hint" class="hint"></p>
+          </div>
         <div id="phone-view" hidden>
           <p class="eyebrow live"><i aria-hidden="true"></i>Paired</p>
           <h2 id="phone-view-name"></h2>
@@ -158,7 +189,10 @@
           <span id="transfer-detail"></span>
         </div>
         <div class="bar" aria-hidden="true"><i id="transfer-bar"></i></div>
-        <button id="transfer-resume" type="button" class="btn ghost small" hidden>Resume</button>
+        <div class="row">
+          <button id="transfer-resume" type="button" class="btn ghost small" hidden>Resume</button>
+          <button id="transfer-cancel" type="button" class="btn ghost small" hidden>Cancel</button>
+        </div>
       </div>
     </section>
   </main>

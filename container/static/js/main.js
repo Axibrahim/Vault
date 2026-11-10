@@ -13,6 +13,7 @@ import { showPair, initPair } from "./views/pair.js";
 import { showPhone, initPhone } from "./views/phone.js";
 import { showOther } from "./views/other.js";
 import { initPwa } from "./ui/pwa.js";
+import { activateTransfers, deactivateTransfers, initTransfers } from "./transfer/controller.js";
 
 async function start() {
   let me;
@@ -20,6 +21,7 @@ async function start() {
     me = await getMe();
   } catch (err) {
     if (err.status === 401) {
+      deactivateTransfers();
       setStatus("Please sign in");
       showLoginOptions();
       show("login");
@@ -47,12 +49,17 @@ async function route() {
   const mine = identity ? devices.find((d) => d.id === identity.deviceId && d.status === "active") : null;
   const kind = detectDeviceKind();
 
-  switch (pickScreen({ kind, accountState, mine: mine || null })) {
+  const screen = pickScreen({ kind, accountState, mine: mine || null });
+  if (screen !== "desktop" && screen !== "phone") deactivateTransfers();
+
+  switch (screen) {
     case "desktop":
       await showDesktop(identity, devices);
+      activateTransfers({ role: "desktop", uid: state.uid, identity, devices });
       break;
     case "phone":
       showPhone(identity);
+      activateTransfers({ role: "phone", uid: state.uid, identity, devices });
       break;
     case "pair":
       showPair();
@@ -74,4 +81,5 @@ initDesktop(start);
 initPair(start);
 initPhone(start);
 initPwa();
+initTransfers();
 start();

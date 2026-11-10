@@ -142,3 +142,10 @@ def test_production_uses_the_host_cookie_name(production_app):
     app = production_app(proxy_hops=1)
     assert app.config["AUTH_COOKIE_NAME"] == "__Host-vault_auth"
     assert app.config["AUTH_COOKIE_SECURE"] is True
+
+def test_every_csp_directive_has_a_valid_name():
+    # a typo such as "work-src" "self" (two strings glued together) silently makes the browser ignore the rule
+    known = {"default-src", "script-src", "style-src", "img-src", "manifest-src", "worker-src", "font-src",
+             "connect-src", "frame-src", "base-uri", "form-action", "frame-ancestors"}
+    names = {part.strip().split(" ")[0] for part in build_csp("example.firebaseapp.com").split(";")}
+    assert names <= known, names - known

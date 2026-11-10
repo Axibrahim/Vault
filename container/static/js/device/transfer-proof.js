@@ -1,7 +1,7 @@
 import { api } from "../core/api.js";
 import { signMessage } from "./identity.js";
 
-async function sha256Hex(value) {
+export async function sha256Hex(value) {
   const bytes = new TextEncoder().encode(value);
   const digest = await crypto.subtle.digest("SHA-256", bytes);
 
@@ -28,6 +28,28 @@ async function createSignedBody(identity, action, parts, extra = {}) {
     challenge,
     signature,
   };
+}
+
+export async function sendSignedOffer(identity, toDeviceId, sdp) {
+  const body = await createSignedBody(
+    identity,
+    "offer",
+    [identity.deviceId, toDeviceId, await sha256Hex(sdp)],
+    { toDeviceId, sdp }
+  );
+
+  return api("POST", "/api/transfers/offer", body);
+}
+
+export async function sendSignedAnswer(identity, transferId, offerSdp, sdp) {
+  const body = await createSignedBody(
+    identity,
+    "answer",
+    [transferId, await sha256Hex(offerSdp), await sha256Hex(sdp)],
+    { sdp }
+  );
+
+  return api("POST", `/api/transfers/${transferId}/answer`, body);
 }
 
 export async function sendSignedIce(identity, transferId, candidate) {

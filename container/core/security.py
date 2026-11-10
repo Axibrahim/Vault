@@ -13,7 +13,6 @@ def build_csp(auth_domain):
     "img-src 'self' data:",
     "manifest-src 'self'",
     "worker-src 'self'",
-    "work-src" "self",
     "font-src 'self'",
     "connect-src 'self' https://identitytoolkit.googleapis.com "
     "https://securetoken.googleapis.com https://www.googleapis.com",

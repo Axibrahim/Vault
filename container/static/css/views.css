@@ -75,3 +75,11 @@
 .transfer[data-state="interrupted"] { border-color: var(--bad); }
 
 .transfer[data-state="interrupted"] .bar i { background: var(--bad); }
+
+/* ---------- sending files ---------- */
+
+.sendbox { margin: 18px 0; padding: 16px; border: 1px dashed var(--line); border-radius: 12px; }
+
+.sendbox.over { border-color: var(--brass); background: rgba(0, 0, 0, 0.28); }
+
+.sendbox .row { margin-bottom: 6px; }

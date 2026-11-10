@@ -62,7 +62,7 @@ jobs:
         with:
           node-version: 22
 
-      - name: Test the browser routing logic
+      - name: Test the browser code (routing, transfers, signatures)
         run: node --test "tests/js/*.test.mjs"
 
   quality-and-security:
