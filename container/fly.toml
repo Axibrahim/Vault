@@ -1,0 +1,30 @@
+# fly.toml app configuration file generated for vault-amr on 2026-11-10T22:13:01+02:00
+#
+# See https://docs.fly.io/reference/configuration for information about how to use this file.
+#
+
+app = 'vault-amr'
+primary_region = 'fra'
+
+[build]
+[env]
+  PROXY_HOPS = '1'
+  VAULT_ENV = 'production'
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    interval = '30s'
+    timeout = '5s'
+    grace_period = '15s'
+    method = 'GET'
+    path = '/api/health'
+
+[[vm]]
+  size = 'shared-cpu-1x'
+  memory = '512mb'

@@ -1,0 +1,17 @@
+# secrets must never be baked into the image
+.env
+.env.*
+serviceAccountKey.json
+*adminsdk*.json
+
+# not needed to run the app
+.git
+.github
+tests
+__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+.coverage
+venv
+.venv
