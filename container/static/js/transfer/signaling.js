@@ -1,7 +1,9 @@
 // The only part of a transfer that talks to our server: a few small signed messages so two
 // devices can find each other. Files never pass through here.
 import { api } from "../core/api.js";
-import { sendSignedAnswer, sendSignedIce, sendSignedOffer, closeSignedTransfer } from "../device/transfer-proof.js";
+import {
+  sendSignedAnswer, sendSignedIce, sendSignedOffer, closeSignedTransfer, recordSignedTransfer,
+} from "../device/transfer-proof.js";
 import { verifyAnswer, verifyOffer, pinPeer } from "../device/verify.js";
 
 export const signaling = {
@@ -10,6 +12,7 @@ export const signaling = {
   sendAnswer: sendSignedAnswer,
   sendIce: sendSignedIce,
   close: closeSignedTransfer,
+  record: recordSignedTransfer,
   verifyOffer,
   verifyAnswer,
   pinPeer,

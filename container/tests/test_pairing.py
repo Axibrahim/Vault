@@ -109,6 +109,12 @@ def test_a_challenge_cannot_be_used_twice(api, desktop):
     assert api.post("/api/pairing/create", json=body).status_code == 201
     assert api.post("/api/pairing/create", json=body).status_code == 403
 
+def test_create_refuses_a_fourth_phone(api, desktop, db):
+    db.collection("users").document("user-1").update({"desktop_count": 1, "phone_count": 3})
+    response = api.post("/api/pairing/create", json=api.signed(desktop, "pairing-create"))
+    assert response.status_code == 409
+    assert response.get_json() == {"error": "This account already has 3 phones"}
+
 
 # ---------- POST /api/pairing/claim ----------
 
@@ -193,6 +199,12 @@ def test_claim_rejects_an_expired_code(api, desktop, phone, db):
 def test_claim_fails_when_the_account_has_no_computer(api, desktop, phone, db):
     code = create_code(api, desktop)["code"]
     db.collection("users").document("user-1").update({"account_state": "no_devices"})
+    assert api.post("/api/pairing/claim", json=claim_body(phone, code)).status_code == 400
+
+
+def test_claim_fails_when_the_phone_limit_is_reached(api, desktop, phone, db):
+    code = create_code(api, desktop)["code"]
+    db.collection("users").document("user-1").update({"desktop_count": 1, "phone_count": 3})
     assert api.post("/api/pairing/claim", json=claim_body(phone, code)).status_code == 400
 
 
@@ -320,6 +332,22 @@ def test_approve_fails_if_the_account_state_changed(api, desktop, phone, db):
     response = approve(api, desktop, pairing_id, fingerprint(phone.jwk))
     # the computer record is still active, so the proof passes and the transaction refuses
     assert response.status_code == 409
+
+def test_approve_fails_when_the_phone_limit_is_reached(api, desktop, phone, db):
+    pairing_id = claimed(api, desktop, phone)
+    db.collection("users").document("user-1").update({"desktop_count": 1, "phone_count": 3})
+    assert approve(api, desktop, pairing_id, fingerprint(phone.jwk)).status_code == 409
+
+
+def test_up_to_three_phones_can_pair(api, desktop, db):
+    for number in range(3):
+        extra = Device("phone", f"Phone {number}")
+        pairing_id = claimed(api, desktop, extra)
+        assert approve(api, desktop, pairing_id, fingerprint(extra.jwk)).status_code == 200
+
+    user = user_doc(db)
+    assert user["phone_count"] == 3 and user["account_state"] == "phone_paired"
+    assert api.post("/api/pairing/create", json=api.signed(desktop, "pairing-create")).status_code == 409
 
 
 # ---------- POST /api/pairing/<id>/cancel ----------

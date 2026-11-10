@@ -86,13 +86,12 @@
           <dl class="meta">
             <div><dt>Receiving folder</dt><dd id="desktop-folder"></dd></div>
             <div><dt>Access</dt><dd id="folder-access"></dd></div>
-            <div><dt>Phone</dt><dd id="phone-status"></dd></div>
+            <div><dt>Phones</dt><dd id="phone-status"></dd></div>
           </dl>
           <button id="regrant-btn" type="button" class="btn primary" hidden>Allow folder access</button>
 
           <div class="row">
             <button id="pair-btn" type="button" class="btn primary">Pair a phone</button>
-            <button id="remove-phone-btn" type="button" class="btn ghost" hidden>Remove phone</button>
           </div>
           <div id="send-box" class="sendbox" hidden>
             <button id="send-btn" type="button" class="btn primary">Send files to phone</button>
@@ -179,6 +178,11 @@
         </div>
       </section>
 
+      <div id="peers-box" class="pairbox" hidden>
+        <p class="eyebrow"><i id="session-dot" class="dot" data-state="offline" aria-hidden="true"></i><span id="session-title">Checking...</span></p>
+        <ul id="peer-list" class="peers"></ul>
+      </div>
+
       <div id="install-box" class="row" hidden>
         <button id="install-btn" type="button" class="btn ghost small" hidden>Install Vault on this device</button>
         <p id="install-ios" class="hint" hidden>To install Vault: tap the Share button, then "Add to Home Screen".</p>
@@ -194,6 +198,12 @@
           <button id="transfer-resume" type="button" class="btn ghost small" hidden>Resume</button>
           <button id="transfer-cancel" type="button" class="btn ghost small" hidden>Cancel</button>
         </div>
+      </div>
+
+      <div id="history-box" class="pairbox" hidden>
+        <p class="eyebrow">Last 30 days</p>
+        <ul id="history-list" class="history"></ul>
+        <p id="history-empty" class="hint" hidden>No transfers yet.</p>
       </div>
     </section>
   </main>

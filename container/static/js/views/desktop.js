@@ -14,6 +14,7 @@ import {
   cancelPairing,
   currentPairing,
 } from "../device/pairing.js";
+import { MAX_PER_TYPE } from "../routing.js";
 import { state } from "../state.js";
 import { $, setStatus, show, every, stopTimer } from "../ui/dom.js";
 
@@ -41,12 +42,10 @@ export async function showDesktop(identity, devices) {
     }
   }
 
-  // phone
-  const phone = devices.find((d) => d.type === "phone" && d.status === "active");
-  state.phoneId = phone ? phone.id : null;
-  $("phone-status").textContent = phone ? phone.name : "No phone paired yet";
-  $("pair-btn").hidden = Boolean(phone);
-  $("remove-phone-btn").hidden = !phone;
+  // phones (each one is listed, with its status dot, in the devices box below)
+  const phones = devices.filter((d) => d.type === "phone" && d.status === "active");
+  $("phone-status").textContent = `${phones.length} of ${MAX_PER_TYPE} paired`;
+  $("pair-btn").hidden = phones.length >= MAX_PER_TYPE;
   $("pair-box").hidden = true;
 
   show("desktop");
@@ -108,7 +107,7 @@ export function initDesktop(refresh) {
   });
 
   $("remove-btn").addEventListener("click", async () => {
-    if (!confirm("Remove this computer from your Vault account? Paired phones are removed too.")) return;
+    if (!confirm("Remove this computer from your Vault account? If it is your last computer, paired phones are removed too.")) return;
 
     const identity = await getDeviceIdentity(state.uid);
     try {
@@ -163,16 +162,5 @@ export function initDesktop(refresh) {
       // the code will expire on its own
     }
     endPairing("Pairing cancelled.");
-  });
-
-  $("remove-phone-btn").addEventListener("click", async () => {
-    if (!state.phoneId || !confirm("Remove the paired phone?")) return;
-    try {
-      await withReauth(() => api("POST", `/api/devices/${state.phoneId}/revoke`));
-    } catch (err) {
-      setStatus("Could not remove the phone");
-      return;
-    }
-    await refresh();
   });
 }

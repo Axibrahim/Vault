@@ -32,7 +32,7 @@ with mock.patch("firebase_admin.initialize_app"), mock.patch("firebase_admin.cre
 
 from core import deviceauth  # noqa: E402
 from core.extensions import limiter  # noqa: E402
-from core.signaling import hub, registry  # noqa: E402
+from core.signaling import board, hub, registry  # noqa: E402
 from tests.fakes import FakeDb  # noqa: E402
 from tests.helpers import Api, Device  # noqa: E402
 
@@ -49,6 +49,7 @@ def clean_state():
     """Every test starts with empty in-memory mailboxes, challenges and rate-limit counters."""
     hub._boxes.clear()
     registry._items.clear()
+    board._items.clear()
     deviceauth._used_challenges.clear()
     limiter.reset()
     limiter.enabled = False          # turned on only by the tests that check rate limits

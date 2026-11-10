@@ -59,7 +59,7 @@ export function initEnroll(refresh) {
       );
     } catch (err) {
       if (created) await forgetDeviceIdentity(state.uid);
-      setStatus(err.status === 409 ? "This account already has a computer set up" : "Setup failed");
+      setStatus(err.status === 409 ? "This account already has 3 computers" : "Setup failed");
       return;
     }
 

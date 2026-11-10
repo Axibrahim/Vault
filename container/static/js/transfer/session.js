@@ -30,11 +30,12 @@ function withTimeout(promise, ms, message) {
 }
 
 export class TransferSession {
-  constructor({ identity, uid, peerId, peerName = "the other device", sink, ui, deps = {} }) {
+  constructor({ identity, uid, peers = [], sink, ui, deps = {} }) {
     this.identity = identity;
     this.uid = uid;
-    this.peerId = peerId;
-    this.peerName = peerName;
+    this.setPeers(peers);
+    this.peerId = null;                       // who the current transfer is with
+    this.peerName = "the other device";
     this.sink = sink;
     this.ui = ui;
     this.signaling = deps.signaling || realSignaling;
@@ -45,6 +46,11 @@ export class TransferSession {
     this.partial = null;    // the batch being received (kept so it can be resumed)
     this.progress = null;
     this.stopListening = null;
+  }
+
+  // The devices this one may talk to: [{ id, name }]. It can change while the page is open.
+  setPeers(list) {
+    this.peers = new Map(list.map((p) => [p.id, p.name]));
   }
 
   start() {
@@ -64,15 +70,15 @@ export class TransferSession {
 
   // ---------------------------------------------------------------- sending
 
-  async send(list) {
+  async send(list, peerId) {
     if (this.busy) throw new Error("A transfer is already in progress");
-    if (!this.peerId) throw new Error("No device to send to");
+    if (!this.peers.has(peerId)) throw new Error("No device to send to");
 
     const files = list.map((file) => {
       const name = safeFileName(file.name);
       return { id: crypto.randomUUID(), file, name, size: file.size, type: cleanMime(file.type, name), startBlock: 0, done: false };
     });
-    this.outgoing = { batch: crypto.randomUUID(), files, total: files.reduce((n, f) => n + f.size, 0) };
+    this.outgoing = { batch: crypto.randomUUID(), files, total: files.reduce((n, f) => n + f.size, 0), peerId };
     await this._run();
   }
 
@@ -94,6 +100,8 @@ export class TransferSession {
 
   async _run() {
     const out = this.outgoing;
+    this.peerId = out.peerId;
+    this.peerName = this.peers.get(out.peerId) || this.peerName;
     let link = null;
     this._startProgress(out.total, out.files.reduce((n, f) => n + (f.done ? f.size : 0), 0));
     this.ui.show("loading", `Connecting to ${this.peerName}`, "Opening a private connection", null, false);
@@ -104,6 +112,7 @@ export class TransferSession {
       await Promise.race([this._upload(link, out, accept), link.dead.promise]);
 
       link.ctl.send(JSON.stringify({ t: "all-done" }));
+      await this.signaling.record(this.identity, link.transferId, out.peerId, out.files.length, out.total).catch(() => {});
       await this.signaling.close(this.identity, link.transferId, "done").catch(() => {});
       this.outgoing = null;
       this._retire(link);
@@ -212,14 +221,12 @@ export class TransferSession {
   // --------------------------------------------------------------- receiving
 
   async _onOffer(evt) {
-    if (evt.from !== this.peerId) {
+    if (!this.peers.has(evt.from) || this.link) {
       await this.signaling.close(this.identity, evt.transferId, "declined").catch(() => {});
       return;
     }
-    if (this.link) {
-      await this.signaling.close(this.identity, evt.transferId, "declined").catch(() => {});
-      return;
-    }
+    this.peerId = evt.from;
+    this.peerName = this.peers.get(evt.from);
 
     const link = this._newLink("receiver");
     link.transferId = evt.transferId;

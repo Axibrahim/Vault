@@ -131,10 +131,23 @@ def test_enroll_creates_the_computer(api, login, seed, db):
     assert user_doc(db)["account_state"] == "desktop_enrolled"
 
 
-def test_enroll_a_second_computer_is_refused(api, desktop):
+def test_a_second_and_third_computer_can_be_enrolled(api, desktop, db):
+    for name in ("Laptop", "Office PC"):
+        device = Device(name=name)
+        response = api.post("/api/devices/enroll-desktop", json=enroll_body(device, name=name))
+        assert response.status_code == 201
+        assert device_doc(db, device)["status"] == "active"
+    user = user_doc(db)
+    assert user["desktop_count"] == 3
+    assert user["account_state"] == "desktop_enrolled"
+
+
+def test_enroll_a_fourth_computer_is_refused(api, desktop):
+    for name in ("Laptop", "Office PC"):
+        assert api.post("/api/devices/enroll-desktop", json=enroll_body(Device(name=name), name=name)).status_code == 201
     response = api.post("/api/devices/enroll-desktop", json=enroll_body(Device()))
     assert response.status_code == 409
-    assert response.get_json() == {"error": "This account already has a computer set up"}
+    assert response.get_json() == {"error": "This account already has 3 computers"}
 
 
 def test_enroll_refuses_a_device_id_that_already_exists(api, login, seed):
@@ -211,6 +224,25 @@ def test_revoking_a_phone_keeps_the_computer(api, desktop, seed, db):
     assert device_doc(db, phone)["status"] == "revoked"
     assert device_doc(db, desktop)["status"] == "active"
     assert user_doc(db)["account_state"] == "desktop_enrolled"
+
+def test_revoking_one_of_several_computers_keeps_the_phones(api, desktop, seed, db):
+    second = Device("desktop", "Laptop")
+    seed.device(second)
+    phone = Device("phone", "My phone")
+    seed.device(phone)
+    db.collection("users").document("user-1").update({"desktop_count": 2, "phone_count": 1})
+
+    assert api.post(f"/api/devices/{desktop.device_id}/revoke").status_code == 200
+    assert device_doc(db, phone)["status"] == "active"
+    user = user_doc(db)
+    assert user["desktop_count"] == 1 and user["phone_count"] == 1
+    assert user["account_state"] == "phone_paired"
+
+    # now the last computer goes, and the phone goes with it
+    assert api.post(f"/api/devices/{second.device_id}/revoke").status_code == 200
+    assert device_doc(db, phone)["status"] == "revoked"
+    user = user_doc(db)
+    assert user["phone_count"] == 0 and user["account_state"] == "no_devices"
 
 
 def test_revoking_twice_returns_not_found(api, desktop):

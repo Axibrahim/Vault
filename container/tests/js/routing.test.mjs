@@ -7,43 +7,51 @@ import { pickScreen } from "../../static/js/routing.js";
 
 const desktopRecord = { id: "d1", type: "desktop", status: "active" };
 const phoneRecord = { id: "p1", type: "phone", status: "active" };
+const counts = (desktop, phone) => ({ desktop, phone });
 
 // ---------- which screen ----------
 
 test("an enrolled computer always sees its own screen", () => {
   for (const kind of ["computer", "phone"]) {
-    for (const accountState of ["desktop_enrolled", "phone_paired"]) {
-      assert.equal(pickScreen({ kind, accountState, mine: desktopRecord }), "desktop");
+    for (const c of [counts(1, 0), counts(3, 3)]) {
+      assert.equal(pickScreen({ kind, counts: c, mine: desktopRecord }), "desktop");
     }
   }
 });
 
 test("a paired phone always sees its own screen", () => {
-  assert.equal(pickScreen({ kind: "phone", accountState: "phone_paired", mine: phoneRecord }), "phone");
+  assert.equal(pickScreen({ kind: "phone", counts: counts(1, 3), mine: phoneRecord }), "phone");
 });
 
 test("a new computer is asked to set itself up", () => {
-  assert.equal(pickScreen({ kind: "computer", accountState: "no_devices", mine: null }), "enroll");
+  assert.equal(pickScreen({ kind: "computer", counts: counts(0, 0), mine: null }), "enroll");
+});
+
+test("a second and third computer can set themselves up too", () => {
+  assert.equal(pickScreen({ kind: "computer", counts: counts(1, 0), mine: null }), "enroll");
+  assert.equal(pickScreen({ kind: "computer", counts: counts(2, 1), mine: null }), "enroll");
+});
+
+test("a fourth computer is told all places are taken", () => {
+  assert.equal(pickScreen({ kind: "computer", counts: counts(3, 0), mine: null }), "other");
 });
 
 test("a new phone is NEVER asked to set up as the computer", () => {
-  assert.equal(pickScreen({ kind: "phone", accountState: "no_devices", mine: null }), "needComputer");
+  assert.equal(pickScreen({ kind: "phone", counts: counts(0, 0), mine: null }), "needComputer");
 });
 
-test("a new phone joins with the code once the computer is ready", () => {
-  assert.equal(pickScreen({ kind: "phone", accountState: "desktop_enrolled", mine: null }), "pair");
+test("a new phone joins with the code once a computer is ready", () => {
+  assert.equal(pickScreen({ kind: "phone", counts: counts(1, 0), mine: null }), "pair");
+  assert.equal(pickScreen({ kind: "phone", counts: counts(2, 2), mine: null }), "pair");
 });
 
-test("a computer that is not the enrolled one is NEVER asked to pair like a phone", () => {
-  assert.equal(pickScreen({ kind: "computer", accountState: "desktop_enrolled", mine: null }), "other");
-  assert.equal(pickScreen({ kind: "computer", accountState: "phone_paired", mine: null }), "other");
+test("a fourth phone is told all places are taken", () => {
+  assert.equal(pickScreen({ kind: "phone", counts: counts(1, 3), mine: null }), "other");
 });
 
-test("a second phone is told one is already paired", () => {
-  assert.equal(pickScreen({ kind: "phone", accountState: "phone_paired", mine: null }), "other");
-});
 
 // ---------- phone or computer ----------
+
 
 const env = (userAgent, extra = {}) => ({
   navigator: { userAgent, maxTouchPoints: 0, ...(extra.navigator || {}) },

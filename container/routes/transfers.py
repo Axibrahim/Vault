@@ -7,12 +7,17 @@ sending device's private key, so nobody who merely holds a stolen session cookie
 can pose as one of your devices.
 """
 import base64
+import base64
 import hashlib
 import hmac
 import time
 import uuid
+from datetime import datetime, timedelta, timezone
 
+from firebase_admin import firestore
 from flask import Blueprint, current_app, g, jsonify, request
+from google.api_core.exceptions import AlreadyExists
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 from core.deviceauth import fingerprint, verify_device_proof
 from core.extensions import limiter
@@ -26,6 +31,10 @@ MAX_SDP_CHARS = 16000
 MAX_CANDIDATE_CHARS = 2000
 MAX_ICE_PER_TRANSFER = 300
 CLOSE_REASONS = {"done", "declined", "cancelled", "error"}
+HISTORY_DAYS = 30
+HISTORY_LIMIT = 50
+MAX_RECORD_FILES = 100_000
+MAX_RECORD_BYTES = 10 * 1024**4      # 10 TB, far above anything real
 
 
 def _sha256_hex(text):
@@ -301,3 +310,79 @@ def events():
     items = hub.wait(g.uid, device_id, after, wait)
     cursor = max((seq for seq, _ in items), default=after)
     return jsonify(events=[{"seq": seq, **event} for seq, event in items], cursor=cursor)
+
+
+def _whole_number(value, low, high):
+    return isinstance(value, int) and not isinstance(value, bool) and low <= value <= high
+
+
+@bp.post("/record")
+@limiter.limit("120 per hour")
+@login_required
+def record():
+    """The sending device notes one finished transfer. Only counts and sizes are kept, never file names."""
+    data = request.get_json(silent=True) or {}
+
+    from_id = _uuid_or_none(data.get("deviceId"))
+    to_id = _uuid_or_none(data.get("toDeviceId"))
+    transfer_id = _uuid_or_none(data.get("transferId"))
+    files, size = data.get("files"), data.get("bytes")
+    if not from_id or not to_id or not transfer_id or from_id == to_id:
+        return jsonify(error="Invalid request"), 400
+    if not _whole_number(files, 1, MAX_RECORD_FILES) or not _whole_number(size, 0, MAX_RECORD_BYTES):
+        return jsonify(error="Invalid request"), 400
+
+    user_ref = _user_ref()
+    sender = verify_device_proof(
+        user_ref, g.uid, data, "record", [transfer_id, to_id, str(files), str(size)],
+        device_types=("desktop", "phone"),
+    )
+    if sender is None:
+        return jsonify(error="Device check failed"), 403
+
+    receiver = _active_device(user_ref, to_id)
+    if receiver is None:
+        return jsonify(error="Device not found"), 404
+
+    expires_at = datetime.now(timezone.utc) + timedelta(days=HISTORY_DAYS)
+    try:
+        user_ref.collection("history").document(transfer_id).create({
+            "from_id": from_id,
+            "from_name": sender["name"],
+            "to_id": to_id,
+            "to_name": receiver["name"],
+            "files": files,
+            "bytes": size,
+            "created_at": firestore.SERVER_TIMESTAMP,
+            "expires_at": expires_at,          # Firestore's TTL policy deletes the entry after this time
+        })
+    except AlreadyExists:
+        pass                                   # the same transfer reported twice: keep the first
+    return jsonify(status="ok")
+
+
+@bp.get("/history")
+@login_required
+def history():
+    """The account's transfers from the last 30 days, newest first."""
+    cutoff = datetime.now(timezone.utc) - timedelta(days=HISTORY_DAYS)
+    query = (
+        _user_ref().collection("history")
+        .where(filter=FieldFilter("created_at", ">=", cutoff))
+        .order_by("created_at", direction="DESCENDING")
+        .limit(HISTORY_LIMIT)
+    )
+    items = []
+    for doc in query.stream():
+        d = doc.to_dict()
+        items.append({
+            "id": doc.id,
+            "fromId": d.get("from_id"),
+            "fromName": d.get("from_name"),
+            "toId": d.get("to_id"),
+            "toName": d.get("to_name"),
+            "files": d.get("files", 0),
+            "bytes": d.get("bytes", 0),
+            "at": d["created_at"].isoformat(),
+        })
+    return jsonify(history=items)

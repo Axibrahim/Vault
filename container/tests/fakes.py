@@ -28,16 +28,20 @@ class FakeSnapshot:
 
 
 class FakeQuery:
-    def __init__(self, collection, filters=(), limit=None):
+    def __init__(self, collection, filters=(), limit=None, order=None):
         self._collection = collection
         self._filters = list(filters)
         self._limit = limit
+        self._order = order            # (field, descending) or None
 
     def where(self, *, filter):
-        return FakeQuery(self._collection, [*self._filters, filter], self._limit)
+        return FakeQuery(self._collection, [*self._filters, filter], self._limit, self._order)
 
     def limit(self, count):
-        return FakeQuery(self._collection, self._filters, count)
+        return FakeQuery(self._collection, self._filters, count, self._order)
+
+    def order_by(self, field, direction="ASCENDING"):
+        return FakeQuery(self._collection, self._filters, self._limit, (field, direction == "DESCENDING"))
 
     @staticmethod
     def _matches(data, flt):
@@ -46,6 +50,8 @@ class FakeQuery:
             return value == flt.value
         if flt.op_string == "in":
             return value in flt.value
+        if flt.op_string == ">=":
+            return value is not None and value >= flt.value
         raise NotImplementedError(flt.op_string)
 
     def stream(self):
@@ -54,6 +60,9 @@ class FakeQuery:
             data = ref.raw()
             if data is not None and all(self._matches(data, f) for f in self._filters):
                 found.append(FakeSnapshot(ref, data))
+        if self._order:
+            field, descending = self._order
+            found.sort(key=lambda snap: snap.to_dict()[field], reverse=descending)
         return iter(found[: self._limit] if self._limit else found)
 
 

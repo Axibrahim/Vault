@@ -83,3 +83,30 @@
 .sendbox.over { border-color: var(--brass); background: rgba(0, 0, 0, 0.28); }
 
 .sendbox .row { margin-bottom: 6px; }
+
+
+/* ---------- status dots, device list, transfer history ---------- */
+.dot {
+  display: inline-block; flex: none; width: 10px; height: 10px; margin-right: 8px;
+  border-radius: 50%; vertical-align: middle;
+  background: #e5584b; box-shadow: 0 0 0 3px rgba(229, 88, 75, 0.2);          /* red: offline */
+}
+.dot[data-state="ready"] { background: #5be3a0; box-shadow: 0 0 0 3px rgba(91, 227, 160, 0.22); }   /* green */
+.dot[data-state="busy"],
+.dot[data-state="blocked"] { background: #f0b45b; box-shadow: 0 0 0 3px rgba(240, 180, 91, 0.22); } /* yellow */
+
+.peers, .history { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 8px; }
+.peer {
+  display: flex; align-items: center; gap: 8px; padding: 10px 12px;
+  border: 1px solid var(--line); border-radius: 12px;
+}
+.peer[data-pick="true"] { cursor: pointer; }
+.peer[data-selected="true"][data-pick="true"] { border-color: rgba(91, 227, 160, 0.6); }
+.peer small { margin-left: auto; opacity: 0.7; }
+.peer .btn { margin-left: 8px; }
+
+.history li {
+  display: flex; justify-content: space-between; gap: 12px; padding: 8px 0;
+  border-bottom: 1px solid var(--line); font-size: 0.85rem;
+}
+.history small { opacity: 0.7; text-align: right; }

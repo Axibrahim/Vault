@@ -94,3 +94,15 @@ export async function closeSignedTransfer(identity, transferId, reason = "done")
     body
   );
 }
+
+
+export async function recordSignedTransfer(identity, transferId, toDeviceId, files, bytes) {
+  const body = await createSignedBody(
+    identity,
+    "record",
+    [transferId, toDeviceId, String(files), String(bytes)],
+    { transferId, toDeviceId, files, bytes }
+  );
+
+  return api("POST", "/api/transfers/record", body);
+}

@@ -11,12 +11,16 @@ from google.cloud.firestore_v1.base_query import FieldFilter
 from core.deviceauth import make_challenge
 from core.extensions import limiter
 from core.firebase_setup import get_db
+from core.signaling import board
 from routes.auth import fresh_login_required, login_required
 
 bp = Blueprint("devices", __name__, url_prefix="/api/devices")
 
 NAME_PATTERN = re.compile(r"[\w .\-]{1,40}")
 B64URL_32_BYTES = re.compile(r"[A-Za-z0-9_-]{43}")   # 32 bytes in base64url, no padding
+
+MAX_PER_TYPE = 3                                      # computers, and phones, per account
+PRESENCE_STATES = {"ready", "busy", "blocked"}
 
 
 class AlreadyEnrolled(Exception):
@@ -25,6 +29,32 @@ class AlreadyEnrolled(Exception):
 
 class DeviceNotFound(Exception):
     pass
+
+
+def counts_of(user):
+    """(computers, phones) the account has.
+
+    Accounts made before the counters existed only have account_state, so it is worked out from that.
+    """
+    user = user or {}
+    if "desktop_count" in user or "phone_count" in user:
+        return user.get("desktop_count", 0), user.get("phone_count", 0)
+    state = user.get("account_state", "no_devices")
+    return (0 if state == "no_devices" else 1), (1 if state == "phone_paired" else 0)
+
+
+def counter_update(desktops, phones):
+    """The user-document fields that go with these counts."""
+    desktops, phones = max(desktops, 0), max(phones, 0)
+    state = "no_devices" if desktops == 0 else "phone_paired" if phones else "desktop_enrolled"
+    return {"desktop_count": desktops, "phone_count": phones, "account_state": state}
+
+
+def _uuid_or_none(value):
+    try:
+        return str(uuid.UUID(str(value)))
+    except ValueError:
+        return None
 
 
 def _b64url_to_int(value):
@@ -61,17 +91,19 @@ def _iso(value):
 @firestore.transactional
 def _enroll_in_txn(transaction, user_ref, device_ref, device_data):
     snapshot = user_ref.get(transaction=transaction)
-    state = (snapshot.to_dict() or {}).get("account_state") if snapshot.exists else None
-    if state != "no_devices":
+    user = snapshot.to_dict() if snapshot.exists else None
+    desktops, phones = counts_of(user)
+    if user is None or desktops >= MAX_PER_TYPE:
         raise AlreadyEnrolled()
 
     transaction.create(device_ref, device_data)
-    transaction.update(user_ref, {"account_state": "desktop_enrolled"})
+    transaction.update(user_ref, counter_update(desktops + 1, phones))
 
 
 @firestore.transactional
 def _revoke_in_txn(transaction, user_ref, device_ref):
     snapshot = device_ref.get(transaction=transaction)
+    user = user_ref.get(transaction=transaction).to_dict()
     if not snapshot.exists:
         raise DeviceNotFound()
 
@@ -83,20 +115,26 @@ def _revoke_in_txn(transaction, user_ref, device_ref):
         "status": "revoked",
         "revoked_at": firestore.SERVER_TIMESTAMP,
     })
-    if device.get("type") == "desktop":
-        transaction.update(user_ref, {"account_state": "no_devices"})
-    elif device.get("type") == "phone":
-        transaction.update(user_ref, {"account_state": "desktop_enrolled"})
 
-    return device.get("type")
+    kind = device.get("type")
+    desktops, phones = counts_of(user)
+    if kind == "desktop":
+        desktops -= 1
+    elif kind == "phone":
+        phones -= 1
+    if kind in ("desktop", "phone"):
+        transaction.update(user_ref, counter_update(desktops, phones))
+
+    return kind, max(desktops, 0)
 
 
 def _revoke_active_phones(user_ref):
-    """When the computer is removed, the phones it vouched for are removed too."""
+    """When the LAST computer is removed, the phones it vouched for are removed too."""
     phones = user_ref.collection("devices").where(filter=FieldFilter("type", "==", "phone")).stream()
     for doc in phones:
         if doc.to_dict().get("status") == "active":
             doc.reference.update({"status": "revoked", "revoked_at": firestore.SERVER_TIMESTAMP})
+    user_ref.update({"phone_count": 0})
 
 
 @bp.get("")
@@ -125,6 +163,30 @@ def list_devices():
 def challenge():
     """A fresh value that a device signs to prove it holds its private key."""
     return jsonify(challenge=make_challenge(g.uid))
+
+
+@bp.post("/presence")
+@limiter.limit("120 per minute")
+@login_required
+def presence():
+    """A device says "I am open, and I am ready / busy / blocked" and gets everyone's status back.
+
+    Nothing is stored in the database. The first beat of a device is checked against it once.
+    """
+    data = request.get_json(silent=True) or {}
+    device_id = _uuid_or_none(data.get("deviceId"))
+    state = data.get("state")
+    if not device_id or state not in PRESENCE_STATES:
+        return jsonify(error="Invalid request"), 400
+
+    if not board.known(g.uid, device_id):
+        snapshot = get_db().collection("users").document(g.uid).collection("devices").document(device_id).get()
+        device = snapshot.to_dict() if snapshot.exists else None
+        if not device or device.get("status") != "active":
+            return jsonify(error="Not found"), 404
+
+    board.beat(g.uid, device_id, state)
+    return jsonify(presence=board.snapshot(g.uid))
 
 
 @bp.post("/enroll-desktop")
@@ -162,7 +224,7 @@ def enroll_desktop():
     try:
         _enroll_in_txn(db.transaction(), user_ref, device_ref, device_data)
     except AlreadyEnrolled:
-        return jsonify(error="This account already has a computer set up"), 409
+        return jsonify(error="This account already has 3 computers"), 409
     except AlreadyExists:
         return jsonify(error="Invalid request"), 400
 
@@ -183,11 +245,12 @@ def revoke_device(device_id):
     device_ref = user_ref.collection("devices").document(device_id)
 
     try:
-        revoked_type = _revoke_in_txn(db.transaction(), user_ref, device_ref)
+        kind, desktops_left = _revoke_in_txn(db.transaction(), user_ref, device_ref)
     except DeviceNotFound:
         return jsonify(error="Not found"), 404
 
-    if revoked_type == "desktop":
+    board.forget(g.uid, device_id)
+    if kind == "desktop" and desktops_left == 0:
         _revoke_active_phones(user_ref)
 
     return jsonify(status="ok")

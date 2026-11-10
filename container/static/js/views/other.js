@@ -5,14 +5,14 @@ import { $, setStatus, show } from "../ui/dom.js";
 // What the screen says, depending on who is looking at it.
 const COPY = {
   computer: {
-    eyebrow: "Another door is open",
-    title: "Already set up elsewhere",
-    lead: "This account is set up on another computer, or this browser's data was cleared. Remove the old computer below to set up this one.",
+    eyebrow: "Every door is taken",
+    title: "3 computers are already set up",
+    lead: "An account can have up to 3 computers. Remove one below to set up this one instead.",
   },
   phone: {
-    eyebrow: "Another door is open",
-    title: "A phone is already paired",
-    lead: "This account already has a paired phone, or this browser's data was cleared. Remove the old one below to pair this phone instead.",
+    eyebrow: "Every door is taken",
+    title: "3 phones are already paired",
+    lead: "An account can have up to 3 phones. Remove one below to pair this phone instead.",
   },
   needComputer: {
     eyebrow: "One step first",

@@ -13,7 +13,7 @@ from core.deviceauth import fingerprint, verify_device_proof
 from core.extensions import limiter
 from core.firebase_setup import get_db
 from routes.auth import fresh_login_required, login_required
-from routes.devices import NAME_PATTERN, clean_public_jwk
+from routes.devices import MAX_PER_TYPE, NAME_PATTERN, clean_public_jwk, counter_update, counts_of
 
 bp = Blueprint("pairing", __name__, url_prefix="/api/pairing")
 
@@ -59,7 +59,8 @@ def _live_pairings(user_ref):
 @firestore.transactional
 def _claim_in_txn(transaction, user_ref, pairing_ref, phone):
     user = user_ref.get(transaction=transaction)
-    if (user.to_dict() or {}).get("account_state") != "desktop_enrolled":
+    desktops, phones = counts_of(user.to_dict())
+    if desktops < 1 or phones >= MAX_PER_TYPE:
         raise PairingError()
 
     snapshot = pairing_ref.get(transaction=transaction)
@@ -77,7 +78,8 @@ def _claim_in_txn(transaction, user_ref, pairing_ref, phone):
 @firestore.transactional
 def _approve_in_txn(transaction, user_ref, pairing_ref, phone_ref, expected_fingerprint):
     user = user_ref.get(transaction=transaction)
-    if (user.to_dict() or {}).get("account_state") != "desktop_enrolled":
+    desktops, phones = counts_of(user.to_dict())
+    if desktops < 1 or phones >= MAX_PER_TYPE:
         raise PairingError()
 
     snapshot = pairing_ref.get(transaction=transaction)
@@ -98,7 +100,7 @@ def _approve_in_txn(transaction, user_ref, pairing_ref, phone_ref, expected_fing
         "last_seen": firestore.SERVER_TIMESTAMP,
     })
     transaction.update(pairing_ref, {"status": "approved", "approved_at": firestore.SERVER_TIMESTAMP})
-    transaction.update(user_ref, {"account_state": "phone_paired"})
+    transaction.update(user_ref, counter_update(desktops, phones + 1))
 
 
 @bp.post("/create")
@@ -108,9 +110,11 @@ def create_pairing():
     data = request.get_json(silent=True) or {}
     user_ref = _user_ref()
 
-    state = (user_ref.get().to_dict() or {}).get("account_state")
-    if state != "desktop_enrolled":
+    desktops, phones = counts_of(user_ref.get().to_dict())
+    if desktops < 1:
         return jsonify(error="Pairing is not available right now"), 409
+    if phones >= MAX_PER_TYPE:
+        return jsonify(error="This account already has 3 phones"), 409
 
     if not verify_device_proof(user_ref, g.uid, data, "pairing-create", []):
         return jsonify(error="Device check failed"), 403

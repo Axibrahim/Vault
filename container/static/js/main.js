@@ -44,12 +44,17 @@ async function start() {
 }
 
 async function route() {
-  const { accountState, devices } = await api("GET", "/api/devices");
+  const { devices } = await api("GET", "/api/devices");
   const identity = await getDeviceIdentity(state.uid);
-  const mine = identity ? devices.find((d) => d.id === identity.deviceId && d.status === "active") : null;
+  const active = devices.filter((d) => d.status === "active");
+  const mine = identity ? active.find((d) => d.id === identity.deviceId) : null;
+  const counts = {
+    desktop: active.filter((d) => d.type === "desktop").length,
+    phone: active.filter((d) => d.type === "phone").length,
+  };
   const kind = detectDeviceKind();
 
-  const screen = pickScreen({ kind, accountState, mine: mine || null });
+  const screen = pickScreen({ kind, counts, mine: mine || null });
   if (screen !== "desktop" && screen !== "phone") deactivateTransfers();
 
   switch (screen) {
@@ -81,5 +86,5 @@ initDesktop(start);
 initPair(start);
 initPhone(start);
 initPwa();
-initTransfers();
+initTransfers(start);
 start();

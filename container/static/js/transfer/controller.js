@@ -1,18 +1,35 @@
-// Connects the transfer code to the screens: the send buttons, the "incoming files" question,
-// the progress card and the phone's save buttons.
-import { getFolder } from "../device/folder.js";
-import { $, setStatus } from "../ui/dom.js";
+// Connects the transfer code to the screens: the send buttons, the device list with its status
+// dots, the "incoming files" question, the progress card and the phone's save buttons.
+import { api } from "../core/api.js";
+import { withReauth } from "../core/auth.js";
+import { folderPermission, getFolder } from "../device/folder.js";
+import { $, every, setStatus, stopTimer } from "../ui/dom.js";
+import { hideHistory, loadHistory } from "../ui/history.js";
+import { issueFor, renderPeers, sessionSummary, stateOf } from "../ui/peers.js";
 import { hideTransfer, onTransferCancel, onTransferResume, showTransfer } from "../ui/transfer.js";
 import { saveToFiles, saveToGallery, isIos } from "./save.js";
 import { formatBytes } from "./safety.js";
 import { TransferSession } from "./session.js";
 import { FolderSink, PhoneSink } from "./sinks.js";
 
+const BEAT_EVERY_MS = 10_000;
+
 let session = null;
-let running = null;      // { role, deviceId, peerId }
+let running = null;        // { role, uid, deviceId }
 let pendingAnswer = null;
-let received = null;     // what the phone holds until the person saves it
+let received = null;       // what the phone holds until the person saves it
 let wakeLock = null;
+
+let peers = [];            // the other kind of device: [{ id, name, ... }]
+let knownIds = new Set();  // every active device of the account
+let selectedId = null;     // who files go to
+let presence = {};         // device id -> "ready" | "busy" | "blocked" (missing = offline)
+let presenceLoaded = false;
+let ownNow = "ready";
+let lastSession = "";
+let beatTimer = null;
+let refreshApp = async () => {};
+let refreshing = false;
 
 // The receiving folder can change while the page is open, so it is looked up when a transfer arrives.
 function lazyFolderSink(uid) {
@@ -40,14 +57,14 @@ async function keepAwake(on) {
   }
 }
 
-function askOnPhone(manifest) {
+function askOnPhone(manifest, who) {
   const gallery = manifest.files.filter((f) => f.kind === "gallery").length;
   const other = manifest.files.length - gallery;
   const parts = [];
   if (gallery) parts.push(`${gallery} photo${gallery === 1 ? "" : "s"} / video${gallery === 1 ? "" : "s"}`);
   if (other) parts.push(`${other} other file${other === 1 ? "" : "s"}`);
 
-  $("incoming-text").textContent = `Your computer wants to send ${parts.join(" and ")} (${formatBytes(manifest.total)}).`;
+  $("incoming-text").textContent = `${who} wants to send ${parts.join(" and ")} (${formatBytes(manifest.total)}).`;
   $("incoming").hidden = false;
   return new Promise((resolve) => {
     pendingAnswer = (accepted) => {
@@ -85,6 +102,7 @@ function showReceivedOnPhone(results) {
 }
 
 function makeUi(role, uid) {
+  const refreshHistory = (delay) => setTimeout(() => { if (running) loadHistory(running.deviceId); }, delay);
   return {
     show(kind, title, detail, progress, resumable = true) {
       keepAwake(kind === "loading");
@@ -94,51 +112,159 @@ function makeUi(role, uid) {
       keepAwake(false);
       hideTransfer();
     },
-    askAccept: role === "phone" ? askOnPhone : async () => true,
+    askAccept: role === "phone"
+      ? (manifest) => askOnPhone(manifest, session ? session.peerName : "Your computer")
+      : async () => true,
     received(results) {
       keepAwake(false);
+      refreshHistory(2000);       // the sender records the transfer a moment after it finishes
       return role === "phone" ? showReceivedOnPhone(results) : showReceivedOnDesktop(uid, results);
     },
     sent(count, total) {
       keepAwake(false);
       showTransfer("received", `Sent ${count} file${count === 1 ? "" : "s"}`, formatBytes(total));
+      refreshHistory(500);
     },
   };
 }
+
+// ---------------------------------------------------------------- status dots
+
+// This device's own state: ready, busy with a transfer, or (computers only) no folder access yet.
+async function ownState() {
+  if (session && session.busy) return "busy";
+  if (running.role === "desktop") {
+    const folder = await getFolder(running.uid);
+    if (!folder || (await folderPermission(folder)) !== "granted") return "blocked";
+  }
+  return "ready";
+}
+
+// Shows the session dot and the device list, and tells the person when something changes.
+function paint() {
+  const peer = peers.find((p) => p.id === selectedId) || null;
+  const peerState = peer ? stateOf(presence, peer.id) : "offline";
+  const summary = sessionSummary({ role: running.role, peer, peerState, ownState: ownNow });
+
+  renderPeers($("peer-list"), {
+    peers,
+    presence,
+    selectedId,
+    onSelect: (id) => { selectedId = id; paint(); },
+    onRemove: running.role === "desktop" ? removePeer : null,
+  });
+  $("session-dot").dataset.state = summary.state;
+  $("session-title").textContent = summary.text;
+
+  // a short message only when the picture changes, never on every beat
+  const key = `${peer ? peer.id : ""}:${summary.state}:${ownNow}`;
+  if (key === lastSession) return;
+  lastSession = key;
+  if (!presenceLoaded || !peer || ownNow === "busy") return;
+  setStatus(summary.state === "ready" ? `Connected to ${peer.name}` : summary.text);
+}
+
+async function beat() {
+  if (!running) return;
+  const deviceId = running.deviceId;
+  try {
+    ownNow = await ownState();
+    const reply = await api("POST", "/api/devices/presence", { deviceId, state: ownNow });
+    if (!running || running.deviceId !== deviceId) return;      // the screen changed meanwhile
+    presence = reply.presence;
+    presenceLoaded = true;
+  } catch (err) {
+    if (err.status === 404 && running) refreshApp();            // this device was removed
+    return;                                                     // anything else: keep the last picture
+  }
+
+  // a device we have never heard of is online: another device was added, so reload the list
+  if (!refreshing && Object.keys(presence).some((id) => !knownIds.has(id))) {
+    refreshing = true;
+    Promise.resolve(refreshApp()).finally(() => { refreshing = false; });
+  }
+  paint();
+}
+
+function startPresence() {
+  stopPresence();
+  beatTimer = every(BEAT_EVERY_MS, beat);
+  beat();
+}
+
+function stopPresence() {
+  if (beatTimer) stopTimer(beatTimer);
+  beatTimer = null;
+  presence = {};
+  presenceLoaded = false;
+  lastSession = "";
+}
+
+async function removePeer(device) {
+  if (!confirm(`Remove "${device.name}" from your Vault account?`)) return;
+  try {
+    await withReauth(() => api("POST", `/api/devices/${device.id}/revoke`));
+  } catch (err) {
+    setStatus("Could not remove that device");
+    return;
+  }
+  await refreshApp();
+}
+
+function syncSendBoxes() {
+  const hasPeer = peers.length > 0;
+  $("send-box").hidden = running.role !== "desktop" || !hasPeer;
+  $("phone-send").hidden = running.role !== "phone" || !hasPeer;
+}
+
+// ---------------------------------------------------------------- start / stop
 
 export function deactivateTransfers() {
   if (session) session.stop();
   session = null;
   running = null;
+  stopPresence();
   if (pendingAnswer) pendingAnswer(false);
   $("send-box").hidden = true;
   $("phone-send").hidden = true;
+  $("peers-box").hidden = true;
+  hideHistory();
 }
 
 // Called by the desktop and phone screens each time they are shown.
 export function activateTransfers({ role, uid, identity, devices }) {
-  const peerType = role === "desktop" ? "phone" : "desktop";
-  const peer = devices.find((d) => d.type === peerType && d.status === "active" && d.id !== identity.deviceId);
-  const peerId = peer ? peer.id : null;
+  const active = devices.filter((d) => d.status === "active");
+  knownIds = new Set(active.map((d) => d.id));
 
-  if (session && running.role === role && running.deviceId === identity.deviceId && running.peerId === peerId) return;
+  const peerType = role === "desktop" ? "phone" : "desktop";
+  peers = active.filter((d) => d.type === peerType && d.id !== identity.deviceId);
+  if (!peers.some((p) => p.id === selectedId)) selectedId = peers.length ? peers[0].id : null;
+
+  // same screen again (for example after a pairing): keep the running transfer, just update the list
+  if (session && running.role === role && running.deviceId === identity.deviceId) {
+    session.setPeers(peers);
+    syncSendBoxes();
+    paint();
+    loadHistory(identity.deviceId);
+    return;
+  }
   deactivateTransfers();
 
-  const hasPeer = Boolean(peerId);
-  $("send-box").hidden = role !== "desktop" || !hasPeer;
-  $("phone-send").hidden = role !== "phone";
-  if (!hasPeer) return;
-
+  running = { role, uid, deviceId: identity.deviceId };
   session = new TransferSession({
     identity,
     uid,
-    peerId,
-    peerName: role === "desktop" ? peer.name : "your computer",
+    peers,
     sink: role === "desktop" ? lazyFolderSink(uid) : new PhoneSink(),
     ui: makeUi(role, uid),
   });
-  running = { role, deviceId: identity.deviceId, peerId };
   session.start();
+
+  $("peers-box").hidden = false;
+  syncSendBoxes();
+  paint();
+  startPresence();
+  loadHistory(identity.deviceId);
 }
 
 function startSending(files) {
@@ -147,9 +273,21 @@ function startSending(files) {
     setStatus("Wait for the current transfer to finish.");
     return;
   }
+
+  const target = peers.find((p) => p.id === selectedId);
+  if (!target) {
+    setStatus("Pair a device to send to first.");
+    return;
+  }
+  const state = stateOf(presence, target.id);
+  if (presenceLoaded && state !== "ready") {
+    setStatus(issueFor(target, state));
+    return;
+  }
+
   setStatus("");
   $("received-box").hidden = true;
-  session.send(files).catch((err) => showTransfer("interrupted", "Could not send", err.message, null, false));
+  session.send(files, target.id).catch((err) => showTransfer("interrupted", "Could not send", err.message, null, false));
 }
 
 function dropped(event) {
@@ -166,8 +304,9 @@ function dropped(event) {
   startSending(files);
 }
 
-// Called once when the page starts.
-export function initTransfers() {
+// Called once when the page starts. `refresh` re-reads the account and redraws the screen.
+export function initTransfers(refresh) {
+  refreshApp = refresh;
   PhoneSink.purge();
 
   const wire = (buttonId, inputId) => {
@@ -194,6 +333,9 @@ export function initTransfers() {
     if (pendingAnswer) pendingAnswer(false);
     if (session) session.cancel();
   });
+
+  // coming back to the page: show a fresh status straight away
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) beat(); });
 
   const finish = async (list, save) => {
     await save(list.map((r) => r.file));

@@ -114,3 +114,44 @@ class TransferRegistry:
 
 hub = SignalHub()
 registry = TransferRegistry()
+
+
+
+class PresenceBoard:
+    """Which devices have Vault open right now. In memory only, like the mailboxes above."""
+
+    def __init__(self, fresh=35, keep=600):
+        self._fresh = fresh      # seconds a heartbeat counts as "online"
+        self._keep = keep        # seconds before a silent device is forgotten completely
+        self._lock = threading.Lock()
+        self._items = {}         # (uid, device_id) -> (time, state)
+
+    def beat(self, uid, device_id, state):
+        now = time.time()
+        with self._lock:
+            for key in [k for k, (stamp, _) in self._items.items() if now - stamp > self._keep]:
+                del self._items[key]
+            self._items[(uid, device_id)] = (now, state)
+
+    def known(self, uid, device_id):
+        """True if this device sent a beat recently (so the database does not need to be asked again)."""
+        with self._lock:
+            item = self._items.get((uid, device_id))
+            return item is not None and time.time() - item[0] <= self._keep
+
+    def snapshot(self, uid):
+        """{device_id: state} for this account's devices that sent a beat in the last `fresh` seconds."""
+        now = time.time()
+        with self._lock:
+            return {
+                device: state
+                for (owner, device), (stamp, state) in self._items.items()
+                if owner == uid and now - stamp <= self._fresh
+            }
+
+    def forget(self, uid, device_id):
+        with self._lock:
+            self._items.pop((uid, device_id), None)
+
+
+board = PresenceBoard()
