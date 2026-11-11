@@ -39,6 +39,10 @@ class BaseConfig:
     TURN_SECRET = os.environ.get("TURN_SECRET", "")
     TURN_TTL_SECONDS = 3600
 
+    # Cloudflare Realtime TURN (free relay). Create a TURN key in the Cloudflare dashboard, then set both values.
+    CLOUDFLARE_TURN_KEY_ID = os.environ.get("CLOUDFLARE_TURN_KEY_ID", "")
+    CLOUDFLARE_TURN_API_TOKEN = os.environ.get("CLOUDFLARE_TURN_API_TOKEN", "")
+
     # -- Firebase --
     FIREBASE_CREDENTIALS_FILE = os.environ.get("FIREBASE_CREDENTIALS_FILE", "serviceAccountKey.json")
     # On a hosting platform there is no key file: put the key (base64-encoded) in this variable instead
@@ -86,6 +90,9 @@ def get_config():
 
     if len(cfg.SECRET_KEY) < 32:
         raise RuntimeError("SECRET_KEY must be at least 32 characters long. Please set it in container/.env.")
+
+    if bool(cfg.CLOUDFLARE_TURN_KEY_ID) != bool(cfg.CLOUDFLARE_TURN_API_TOKEN):
+        raise RuntimeError("CLOUDFLARE_TURN_KEY_ID and CLOUDFLARE_TURN_API_TOKEN must be set together (or both left empty).")
 
     if bool(cfg.TURN_URLS) != bool(cfg.TURN_SECRET):
         raise RuntimeError("TURN_URLS and TURN_SECRET must be set together (or both left empty).")

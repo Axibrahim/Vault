@@ -7,7 +7,7 @@ from core.config import get_config
 from core.extensions import limiter
 from core.firebase_setup import init_firebase
 from core.security import register_security
-from routes import auth, devices, pairing, transfers
+from routes import auth, devices, pairing, settings, transfers
 
 mimetypes.add_type("application/manifest+json", ".webmanifest")
 
@@ -33,6 +33,7 @@ def create_app():
     app.register_blueprint(devices.bp)
     app.register_blueprint(pairing.bp)
     app.register_blueprint(transfers.bp)
+    app.register_blueprint(settings.bp)
 
     @app.get("/")
     def index():

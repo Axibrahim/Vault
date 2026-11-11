@@ -5,6 +5,7 @@ import time
 import uuid
 
 import pytest
+import requests
 
 from core.deviceauth import fingerprint
 from core.signaling import hub, registry
@@ -107,6 +108,93 @@ def test_ice_servers_can_be_empty(api, login, flask_app, monkeypatch):
     monkeypatch.setitem(flask_app.config, "STUN_URLS", "")
     login()
     assert api.get("/api/transfers/ice-servers").get_json() == {"iceServers": []}
+    
+
+class FakeReply:
+    def __init__(self, payload=None, status=200, bad_json=False):
+        self.payload, self.status, self.bad_json = payload, status, bad_json
+
+    def raise_for_status(self):
+        if self.status >= 400:
+            raise requests.HTTPError("failed")
+
+    def json(self):
+        if self.bad_json:
+            raise ValueError("not json")
+        return self.payload
+
+
+@pytest.fixture
+def cloudflare(flask_app, monkeypatch):
+    """Turns the Cloudflare relay on and records what the server sent to it."""
+    monkeypatch.setitem(flask_app.config, "CLOUDFLARE_TURN_KEY_ID", "key/id")
+    monkeypatch.setitem(flask_app.config, "CLOUDFLARE_TURN_API_TOKEN", "api-token")
+    calls = []
+    answer = {"reply": FakeReply({"iceServers": []})}
+
+    def fake_post(url, **kwargs):
+        calls.append((url, kwargs))
+        if isinstance(answer["reply"], Exception):
+            raise answer["reply"]
+        return answer["reply"]
+
+    monkeypatch.setattr(requests, "post", fake_post)
+    return calls, answer
+
+
+CLOUDFLARE_ANSWER = {"iceServers": [
+    {"urls": ["stun:stun.cloudflare.com:3478", "stun:stun.cloudflare.com:53"]},
+    {
+        "urls": [
+            "turn:turn.cloudflare.com:3478?transport=udp",
+            "turn:turn.cloudflare.com:53?transport=udp",
+            "turns:turn.cloudflare.com:443?transport=tcp",
+        ],
+        "username": "u", "credential": "c",
+    },
+]}
+
+
+def test_ice_servers_adds_cloudflare_relay_and_drops_port_53(api, login, cloudflare):
+    calls, answer = cloudflare
+    answer["reply"] = FakeReply(CLOUDFLARE_ANSWER)
+    login()
+
+    servers = api.get("/api/transfers/ice-servers").get_json()["iceServers"]
+    assert servers[0] == {"urls": ["stun:stun.example.com:3478"]}       # our own STUN stays first
+    assert servers[1] == {"urls": ["stun:stun.cloudflare.com:3478"]}
+    assert servers[2]["urls"] == ["turn:turn.cloudflare.com:3478?transport=udp", "turns:turn.cloudflare.com:443?transport=tcp"]
+    assert (servers[2]["username"], servers[2]["credential"]) == ("u", "c")
+
+    url, kwargs = calls[0]
+    assert url.endswith("/keys/key%2Fid/credentials/generate-ice-servers")      # the key id is escaped
+    assert kwargs["headers"] == {"Authorization": "Bearer api-token"}
+    assert kwargs["json"] == {"ttl": 3600} and kwargs["timeout"] == 4
+
+
+def test_ice_servers_accepts_a_single_server_object_from_cloudflare(api, login, cloudflare):
+    _, answer = cloudflare
+    answer["reply"] = FakeReply({"iceServers": CLOUDFLARE_ANSWER["iceServers"][1]})
+    login()
+    servers = api.get("/api/transfers/ice-servers").get_json()["iceServers"]
+    assert len(servers) == 2 and servers[1]["username"] == "u"
+
+
+@pytest.mark.parametrize("reply", [
+    requests.ConnectionError("down"),
+    FakeReply(status=503),
+    FakeReply(bad_json=True),
+    FakeReply({"nothing": []}),
+    FakeReply({"iceServers": [{"urls": "turn:one-string"}]}),
+    FakeReply({"iceServers": 5}),
+])
+def test_ice_servers_still_work_when_cloudflare_fails(api, login, cloudflare, reply):
+    _, answer = cloudflare
+    answer["reply"] = reply
+    login()
+    response = api.get("/api/transfers/ice-servers")
+    assert response.status_code == 200
+    assert response.get_json() == {"iceServers": [{"urls": ["stun:stun.example.com:3478"]}]}
 
 
 # ---------- POST /api/transfers/offer ----------

@@ -2,7 +2,7 @@
 // moving the files and surviving a dropped connection. The browser pieces (RTCPeerConnection,
 // the server calls and the screen) are passed in, which is also how the tests run it.
 import {
-  BLOCK_SIZE, CONTROL_LABEL, FILE_PREFIX, LANES, blockCount, parseControl, resumeBlock,
+  BLOCK_SIZE, CONTROL_LABEL, FILE_PREFIX, LANES, blockCount, connectionAdvice, hasRelay, parseControl, resumeBlock,
 } from "./protocol.js";
 import { cleanMime, formatBytes, safeFileName } from "./safety.js";
 import { sendFile } from "./sender.js";
@@ -148,7 +148,9 @@ export class TransferSession {
   }
 
   async _dialInto(link) {
-    link.pc = new this.RTC({ iceServers: await this.signaling.getIceServers() });
+    const iceServers = await this.signaling.getIceServers();
+    link.relay = hasRelay(iceServers);
+    link.pc = new this.RTC({ iceServers });
     this._wirePc(link);
     link.ctl = link.pc.createDataChannel(CONTROL_LABEL);
     this._wireControl(link, link.ctl);
@@ -163,7 +165,7 @@ export class TransferSession {
     this._flushLocalIce(link);
 
     await Promise.race([
-      withTimeout(link.opened.promise, DIAL_TIMEOUT_MS, "Could not connect. If you are on mobile data, a relay (TURN) server may be needed."),
+      withTimeout(link.opened.promise, DIAL_TIMEOUT_MS, `Could not connect. ${connectionAdvice(link.relay)}`),
       link.dead.promise,
     ]);
     return link;
@@ -236,7 +238,9 @@ export class TransferSession {
       const printed = await this.signaling.verifyOffer(evt, this.identity.deviceId);
       await this.signaling.pinPeer(this.uid, evt.from, printed);
 
-      link.pc = new this.RTC({ iceServers: await this.signaling.getIceServers() });
+      const iceServers = await this.signaling.getIceServers();
+      link.relay = hasRelay(iceServers);
+      link.pc = new this.RTC({ iceServers });
       this._wirePc(link);
       link.pc.ondatachannel = (e) => this._onChannel(link, e.channel);
 
@@ -355,7 +359,7 @@ export class TransferSession {
     return {
       side, pc: null, ctl: null, transferId: null, offerSdp: null, manifest: null,
       opened: deferred(), dead: deferred(), abort: new AbortController(),
-      early: [], localIce: [], remoteIce: [], iceSent: 0, ended: false, closing: false, dropTimer: null,
+      early: [], localIce: [], remoteIce: [], iceSent: 0, ended: false, closing: false, dropTimer: null, relay: false,
       onAccept: null, onDecline: null,
     };
   }
@@ -370,7 +374,7 @@ export class TransferSession {
     link.pc.onconnectionstatechange = () => {
       const state = link.pc.connectionState;
       if (state === "connected") clearTimeout(link.dropTimer);
-      else if (state === "failed") this._fail(link, new Error("The connection failed"));
+      else if (state === "failed") this._fail(link, new Error(`The connection failed. ${connectionAdvice(link.relay)}`));
       else if (state === "disconnected") {
         clearTimeout(link.dropTimer);
         link.dropTimer = setTimeout(() => {

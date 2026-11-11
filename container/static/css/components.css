@@ -59,3 +59,47 @@ input:focus { border-color: var(--brass-d); }
 .toast { position: fixed; left: 50%; bottom: max(24px, env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 5; margin: 0; padding: 10px 18px; border-radius: 999px; background: rgba(16, 18, 22, 0.92); border: 1px solid var(--line); font: 500 0.8rem var(--mono); color: var(--text); }
 
 .toast:empty { display: none; }
+
+/* ---------- top bar actions and the Settings dial ---------- */
+
+.top-actions { display: flex; align-items: center; gap: 20px; }
+
+.settings-btn {
+  position: relative; display: inline-flex; align-items: center; gap: 10px;
+  min-height: 44px; padding: 0 16px 0 12px; border-radius: 999px;
+  border: 1px solid var(--line); background: rgba(16, 18, 22, 0.72);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  color: var(--text); font: 600 0.88rem var(--sans); cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, color 0.2s, transform 0.15s;
+}
+
+.settings-btn:hover { border-color: var(--brass-d); }
+
+.settings-btn:active { transform: scale(0.97); }
+
+.settings-btn:focus-visible { outline: 2px solid var(--brass); outline-offset: 3px; }
+
+.settings-btn[aria-expanded="true"] { background: var(--brass); border-color: var(--brass); color: #1a1205; }
+
+/* one ring of light each time Settings opens */
+.settings-btn::after { content: ""; position: absolute; inset: -1px; border-radius: inherit; pointer-events: none; }
+
+.settings-btn[aria-expanded="true"]::after { animation: dial-ping 0.6s ease-out; }
+
+@keyframes dial-ping {
+  from { box-shadow: 0 0 0 0 rgba(240, 180, 91, 0.55); }
+  to { box-shadow: 0 0 0 14px rgba(240, 180, 91, 0); }
+}
+
+/* a vault combination dial: it clicks round on hover and turns all the way when Settings opens */
+.dial { width: 22px; height: 22px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; overflow: visible; }
+
+.dial-ring { transform-box: fill-box; transform-origin: center; transition: transform 0.36s steps(3, end); }
+
+.dial-pin { fill: var(--brass); stroke: none; transition: fill 0.2s; }
+
+.settings-btn:hover .dial-ring, .settings-btn:focus-visible .dial-ring { transform: rotate(45deg); }
+
+.settings-btn[aria-expanded="true"] .dial-ring { transform: rotate(180deg); transition: transform 0.6s cubic-bezier(0.3, 1.5, 0.5, 1); }
+
+.settings-btn[aria-expanded="true"] .dial-pin { fill: #1a1205; }

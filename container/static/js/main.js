@@ -12,6 +12,7 @@ import { showDesktop, initDesktop } from "./views/desktop.js";
 import { showPair, initPair } from "./views/pair.js";
 import { showPhone, initPhone } from "./views/phone.js";
 import { showOther } from "./views/other.js";
+import { closeSettings, initSettings, showSettingsButton } from "./views/settings.js";
 import { initPwa } from "./ui/pwa.js";
 import { activateTransfers, deactivateTransfers, initTransfers } from "./transfer/controller.js";
 
@@ -21,6 +22,8 @@ async function start() {
     me = await getMe();
   } catch (err) {
     if (err.status === 401) {
+      closeSettings();
+      showSettingsButton(false);
       deactivateTransfers();
       setStatus("Please sign in");
       showLoginOptions();
@@ -33,7 +36,8 @@ async function start() {
   }
 
   state.uid = me.uid;
-  $("user-email").textContent = me.email;
+  $("settings-email").textContent = me.email;
+  showSettingsButton(true);
   setStatus("");
 
   try {
@@ -87,4 +91,5 @@ initPair(start);
 initPhone(start);
 initPwa();
 initTransfers(start);
+initSettings(start);
 start();

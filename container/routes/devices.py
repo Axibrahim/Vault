@@ -158,7 +158,7 @@ def list_devices():
 
 
 @bp.post("/challenge")
-@limiter.limit("60 per minute")
+@limiter.limit("240 per minute")      # every signed message (even each network candidate) needs one
 @login_required
 def challenge():
     """A fresh value that a device signs to prove it holds its private key."""

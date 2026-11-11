@@ -1,47 +1,33 @@
-// "Last 30 days": what was sent and received on this account.
+// The Activity tab in Settings: what was sent and received on this account in the last 30 days.
 import { api } from "../core/api.js";
-import { formatBytes } from "../transfer/safety.js";
 import { $ } from "./dom.js";
+import { describeTransfer, relativeTime, summarizeActivity } from "./settings-format.js";
 
-const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
-
-function when(iso) {
-  return new Date(iso).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
-}
-
-export function describeTransfer(item, myId) {
-  const sent = item.fromId === myId;
-  return {
-    title: `${sent ? "Sent to" : "Received from"} ${sent ? item.toName : item.fromName}`,
-    detail: `${plural(item.files, "file")} · ${formatBytes(item.bytes)}`,
-  };
-}
-
-export function hideHistory() {
-  $("history-box").hidden = true;
-}
+const settingsIsOpen = () => document.body.dataset.panel === "settings";
 
 export async function loadHistory(myId) {
+  if (!settingsIsOpen()) return;              // nobody is looking at the list, so do not ask for it
   let items;
   try {
     ({ history: items } = await api("GET", "/api/transfers/history"));
   } catch (err) {
     return;                                   // keep whatever is shown
   }
-  if ($("peers-box").hidden) return;          // the person left this screen while we were loading
+  if (!settingsIsOpen()) return;              // the person closed Settings while we were loading
 
   const list = $("history-list");
   list.replaceChildren();
-  for (const item of items) {
+  items.forEach((item, index) => {
     const { title, detail } = describeTransfer(item, myId);
     const row = document.createElement("li");
+    row.style.setProperty("--i", String(Math.min(index, 8)));
     const text = document.createElement("span");
     text.textContent = title;
     const meta = document.createElement("small");
-    meta.textContent = `${detail} · ${when(item.at)}`;
+    meta.textContent = `${detail} · ${relativeTime(item.at)}`;
     row.append(text, meta);
     list.append(row);
-  }
+  });
   $("history-empty").hidden = items.length > 0;
-  $("history-box").hidden = false;
+  $("history-summary").textContent = summarizeActivity(items, myId);
 }

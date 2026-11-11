@@ -9,10 +9,13 @@ can pose as one of your devices.
 import base64
 import hashlib
 import hmac
+import re
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
+from urllib.parse import quote
 
+import requests
 from firebase_admin import firestore
 from flask import Blueprint, current_app, g, jsonify, request
 from google.api_core.exceptions import AlreadyExists
@@ -30,6 +33,8 @@ MAX_SDP_CHARS = 16000
 MAX_CANDIDATE_CHARS = 2000
 MAX_ICE_PER_TRANSFER = 300
 CLOSE_REASONS = {"done", "declined", "cancelled", "error"}
+CLOUDFLARE_TURN_URL = "https://rtc.live.cloudflare.com/v1/turn/keys/{key_id}/credentials/generate-ice-servers"
+CLOUDFLARE_TIMEOUT_SECONDS = 4
 HISTORY_DAYS = 30
 HISTORY_LIMIT = 50
 MAX_RECORD_FILES = 100_000
@@ -61,7 +66,39 @@ def _urls(text):
     return [part.strip() for part in text.split(",") if part.strip()]
 
 
+def _cloudflare_servers(cfg):
+    """Short-lived relay credentials from Cloudflare.
+
+    Returns [] when the call fails, so devices on the same network can still connect directly.
+    The relay only ever carries data that is already end-to-end encrypted (DTLS).
+    """
+    try:
+        reply = requests.post(
+            CLOUDFLARE_TURN_URL.format(key_id=quote(cfg["CLOUDFLARE_TURN_KEY_ID"], safe="")),
+            headers={"Authorization": f"Bearer {cfg['CLOUDFLARE_TURN_API_TOKEN']}"},
+            json={"ttl": cfg["TURN_TTL_SECONDS"]},
+            timeout=CLOUDFLARE_TIMEOUT_SECONDS,
+        )
+        reply.raise_for_status()
+        servers = reply.json()["iceServers"]
+        if isinstance(servers, dict):
+            servers = [servers]
+        for server in servers:
+            if not isinstance(server["urls"], list):
+                raise ValueError("unexpected address list")
+    except (requests.RequestException, ValueError, KeyError, TypeError) as err:
+        current_app.logger.warning("Cloudflare TURN unavailable: %s", type(err).__name__)
+        return []
+
+    # Browsers block port 53, so those addresses would only add a timeout.
+    return [
+        {**server, "urls": [url for url in server["urls"] if not re.search(r":53(\?|$)", url)]}
+        for server in servers
+    ]
+
+
 @bp.get("/ice-servers")
+@limiter.limit("30 per minute")
 @login_required
 def ice_servers():
     """Helper servers the browsers use to find a path to each other."""
@@ -84,6 +121,9 @@ def ice_servers():
             "username": username,
             "credential": base64.b64encode(digest).decode(),
         })
+
+    if cfg["CLOUDFLARE_TURN_KEY_ID"]:
+        servers.extend(_cloudflare_servers(cfg))
 
     return jsonify(iceServers=servers)
 

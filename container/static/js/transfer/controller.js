@@ -4,7 +4,7 @@ import { api } from "../core/api.js";
 import { withReauth } from "../core/auth.js";
 import { folderPermission, getFolder } from "../device/folder.js";
 import { $, every, setStatus, stopTimer } from "../ui/dom.js";
-import { hideHistory, loadHistory } from "../ui/history.js";
+import { loadHistory } from "../ui/history.js";
 import { issueFor, renderPeers, sessionSummary, stateOf } from "../ui/peers.js";
 import { hideTransfer, onTransferCancel, onTransferResume, showTransfer } from "../ui/transfer.js";
 import { saveToFiles, saveToGallery, isIos } from "./save.js";
@@ -209,6 +209,12 @@ async function removePeer(device) {
     return;
   }
   await refreshApp();
+}
+
+// How another device (or this one) is doing right now: "ready", "busy", "blocked" or "offline".
+export function deviceState(id) {
+  if (running && id === running.deviceId) return ownNow;
+  return stateOf(presence, id);
 }
 
 function syncSendBoxes() {

@@ -64,6 +64,7 @@ def db(monkeypatch):
         "routes.auth.get_db",
         "routes.devices.get_db",
         "routes.pairing.get_db",
+        "routes.settings.get_db",
         "routes.transfers.get_db",
         "core.firebase_setup.get_db",
     ):
@@ -124,7 +125,7 @@ def login(api, stub):
 
     def _login(uid="user-1", email="user@example.com", age=10):
         cookie = f"cookie-{uid}"
-        stub.sessions[cookie] = {"uid": uid, "email": email, "auth_time": time.time() - age}
+        stub.sessions[cookie] = {"uid": uid, "email": email, "auth_time": time.time() - age, "exp": time.time() + 3600}
         api.client.set_cookie("vault_auth", cookie)
         return uid
 

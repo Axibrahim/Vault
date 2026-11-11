@@ -50,6 +50,7 @@ def login_required(view):
         g.uid = claims["uid"]
         g.email = claims.get("email")
         g.auth_time = claims.get("auth_time", 0)   # when the Google sign-in really happened
+        g.session_exp = claims.get("exp", 0)       # when this session cookie stops working
         return view(*args, **kwargs)
 
     return wrapper

@@ -6,10 +6,6 @@
 
 .ico { flex: none; fill: none; stroke: var(--brass); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
 
-.userbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 26px; padding-bottom: 16px; border-bottom: 1px solid var(--line); font-size: 0.8rem; color: var(--muted); }
-
-.userbar strong { color: var(--text); font-weight: 500; word-break: break-all; }
-
 .steps { list-style: none; padding: 0; margin: 0 0 8px; display: flex; gap: 8px; font: 500 0.72rem var(--mono); color: var(--muted); }
 
 .steps li { flex: 1; display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; }
@@ -49,8 +45,6 @@
 .userbtns { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 
 .pairbox { margin: 18px 0; padding: 16px; border: 1px dashed var(--brass-d); border-radius: 12px; background: rgba(0, 0, 0, 0.28); }
-
-.pairbox .lead { margin-bottom: 8px; }
 
 .code { margin: 8px 0; font: 600 2rem var(--mono); letter-spacing: 0.3em; color: var(--brass); overflow-wrap: anywhere; }
 
@@ -110,3 +104,78 @@
   border-bottom: 1px solid var(--line); font-size: 0.85rem;
 }
 .history small { opacity: 0.7; text-align: right; }
+
+/* ---------- Settings: takes the place of the main panel ---------- */
+
+body[data-panel="settings"] #app-view > :not(#settings-view),
+body[data-panel="settings"] #peers-box { display: none; }
+
+/* the screen that arrives (Settings opening, or the main screen coming back) eases in once */
+#app-view > :not([hidden]) { animation: sheet-in 0.36s cubic-bezier(0.2, 0.8, 0.2, 1); }
+
+@keyframes sheet-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+
+.acct { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; }
+
+.acct-text { flex: 1; min-width: 0; }
+
+.acct strong { display: block; font-weight: 600; overflow-wrap: anywhere; }
+
+.acct .btn.ghost { flex: none; }
+
+.acct small { color: var(--muted); font-size: 0.8rem; }
+
+.avatar { display: grid; place-items: center; flex: none; width: 44px; height: 44px; border-radius: 50%; background: var(--brass); color: #1a1205; font: 700 1.1rem var(--sans); }
+
+.tabs { position: relative; display: flex; margin: 0 0 20px; border-bottom: 1px solid var(--line); }
+
+.tab { flex: 1; min-height: 44px; padding: 0 8px; border: 0; border-radius: 8px 8px 0 0; background: none; color: var(--muted); font: 600 0.9rem var(--sans); cursor: pointer; transition: color 0.2s; }
+
+.tab:hover, .tab[aria-selected="true"] { color: var(--text); }
+
+.tab:focus-visible { outline: 2px solid var(--brass); outline-offset: -2px; }
+
+#history-summary { margin: 0 0 10px; }
+
+#settings-devices-hint { margin-top: 12px; }
+
+/* the panel keeps its height when you change tabs, so it does not jump */
+@media (min-width: 861px) { #settings-view [role="tabpanel"] { min-height: 340px; } }
+
+.tab-ink { position: absolute; left: 0; bottom: -1px; width: var(--ink-w, 0px); height: 2px; background: var(--brass); transform: translateX(var(--ink-x, 0px)); transition: transform 0.3s cubic-bezier(0.3, 1.2, 0.4, 1), width 0.3s ease; }
+
+.sdevices { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+
+.sdevice { display: grid; grid-template-columns: 1fr auto; align-items: start; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: rgba(0, 0, 0, 0.22); animation: row-in 0.3s both; animation-delay: calc(var(--i, 0) * 50ms); }
+
+.sdevice[data-mine="true"] { border-color: var(--brass-d); }
+
+.sdevice-main { display: grid; gap: 2px; min-width: 0; }
+
+.sdevice-name { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-weight: 600; overflow-wrap: anywhere; }
+
+.sdevice small { color: var(--muted); font-size: 0.78rem; }
+
+.badge { padding: 1px 8px; border: 1px solid var(--brass-d); border-radius: 999px; color: var(--brass); font: 600 0.68rem var(--sans); }
+
+.fp { margin-top: 4px; font: 500 0.72rem var(--mono); letter-spacing: 0.08em; color: var(--muted); overflow-wrap: anywhere; }
+
+.sdevice-state { display: flex; align-items: center; font-size: 0.78rem; color: var(--muted); }
+
+.sdevice-side { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+
+.sdevice-side .btn { flex: none; }
+
+.btn.danger[data-armed="true"] { background: var(--bad); border-color: var(--bad); color: #fff; animation: arm 0.25s ease-out; }
+
+@keyframes arm { from { transform: scale(0.94); } to { transform: none; } }
+
+.history li { animation: row-in 0.3s both; animation-delay: calc(var(--i, 0) * 40ms); }
+
+@keyframes row-in {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: none; }
+}

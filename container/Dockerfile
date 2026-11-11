@@ -17,5 +17,6 @@ USER appuser
 
 EXPOSE 8080
 
-# one worker on purpose: the transfer messages live in this process's memory
-CMD ["gunicorn", "app:app", "--worker-class", "gthread", "--workers", "1", "--threads", "16", "--bind", "0.0.0.0:8080", "--timeout", "120", "--access-logfile", "-"]
+# one worker on purpose: the transfer messages live in this process's memory.
+# every open device holds one thread while it waits for messages, so there are plenty of them
+CMD ["gunicorn", "app:app", "--worker-class", "gthread", "--workers", "1", "--threads", "64", "--bind", "0.0.0.0:8080", "--timeout", "120", "--access-logfile", "-"]

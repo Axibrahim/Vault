@@ -109,3 +109,16 @@ export function parseFileMessage(text) {
   if (msg.t === "error") return { t: "error", reason: String(msg.reason ?? "").slice(0, 80) };
   throw new Error("Unknown message");
 }
+
+// True when the list of helper servers includes a relay (TURN). Without one, two devices on
+// different networks (for example Wi-Fi and mobile data) often cannot reach each other.
+export function hasRelay(iceServers) {
+  return iceServers.some((server) => [].concat(server.urls).some((url) => /^turns?:/i.test(url)));
+}
+
+// What to tell the person when the connection could not be opened.
+export function connectionAdvice(relay) {
+  return relay
+    ? "Check that Vault is open on both devices, then try again."
+    : "These two networks cannot reach each other directly and no relay server is set up yet.";
+}
