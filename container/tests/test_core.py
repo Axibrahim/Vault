@@ -417,6 +417,14 @@ def test_turn_settings_must_come_together(fresh_config):
     assert fresh_config(TURN_URLS="turn:x", TURN_SECRET="s").TURN_URLS == "turn:x"
 
 
+def test_cloudflare_turn_settings_must_come_together(fresh_config):
+    with pytest.raises(RuntimeError, match="CLOUDFLARE_TURN_KEY_ID"):
+        fresh_config(CLOUDFLARE_TURN_KEY_ID="key", CLOUDFLARE_TURN_API_TOKEN="")
+    with pytest.raises(RuntimeError, match="CLOUDFLARE_TURN_KEY_ID"):
+        fresh_config(CLOUDFLARE_TURN_KEY_ID="", CLOUDFLARE_TURN_API_TOKEN="token")
+    assert fresh_config(CLOUDFLARE_TURN_KEY_ID="key", CLOUDFLARE_TURN_API_TOKEN="token").CLOUDFLARE_TURN_KEY_ID == "key"
+
+
 # ======================= firebase_setup =======================
 
 class FakeApp:
