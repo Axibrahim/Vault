@@ -43,7 +43,9 @@ async function verifyFrom(evt, action, parts) {
 }
 
 export async function verifyOffer(evt, myDeviceId) {
-  return verifyFrom(evt, "offer", [evt.from, myDeviceId, await sha256Hex(evt.sdp)]);
+  const parts = [evt.from, myDeviceId, await sha256Hex(evt.sdp)];
+  if (evt.kind === "clip") parts.push("clip");        // the kind was signed too
+  return verifyFrom(evt, "offer", parts);
 }
 
 export async function verifyAnswer(evt, offerSdp) {

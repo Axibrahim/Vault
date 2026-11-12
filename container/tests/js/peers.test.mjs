@@ -31,3 +31,26 @@ test("with nobody to talk to the session is red and says what to do", () => {
   assert.equal(sessionSummary({ role: "desktop", peer: null, peerState: "offline", ownState: "ready" }).text, "No phone paired yet");
   assert.equal(sessionSummary({ role: "phone", peer: null, peerState: "offline", ownState: "ready" }).text, "No computer set up yet");
 });
+// ---------------------------------------------------------------- dropping files onto the page
+
+import { dropState } from "../../static/js/ui/peers.js";
+
+const phone = { id: "p1", name: "My phone" };
+const ready = { role: "desktop", peer: phone, peerState: "ready", ownState: "ready", busy: false };
+
+test("a file may be dropped only when the session is ready", () => {
+  assert.deepEqual(dropState(ready), { ok: true, message: "Drop to send to My phone" });
+});
+
+test("every reason a drop is refused has its own sentence", () => {
+  assert.equal(dropState({ ...ready, role: "phone" }).ok, false);
+  assert.match(dropState({ ...ready, role: "phone" }).message, /from your computer/);
+  assert.match(dropState({ ...ready, peer: null }).message, /Pair a phone/);
+  assert.match(dropState({ ...ready, busy: true }).message, /Wait for the current transfer/);
+  assert.match(dropState({ ...ready, ownState: "busy" }).message, /Wait for the current transfer/);
+  assert.match(dropState({ ...ready, ownState: "blocked" }).message, /Allow folder access/);
+  assert.match(dropState({ ...ready, peerState: "offline" }).message, /offline/);
+  assert.match(dropState({ ...ready, peerState: "busy" }).message, /busy/);
+  assert.match(dropState({ ...ready, peerState: "blocked" }).message, /cannot receive yet/);
+  for (const peerState of ["offline", "busy", "blocked"]) assert.equal(dropState({ ...ready, peerState }).ok, false);
+});

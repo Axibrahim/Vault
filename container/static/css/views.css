@@ -109,7 +109,28 @@
 
 body[data-panel="settings"] #app-view > :not(#settings-view),
 body[data-panel="settings"] #peers-box { display: none; }
+.history small { opacity: 0.7; text-align: right; }
 
+/* shared text box */
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.clip-input {
+  width: 100%; min-height: 110px; margin: 8px 0 10px; padding: 12px; resize: vertical;
+  border: 1px solid var(--line); border-radius: 12px; background: rgba(0, 0, 0, 0.35);
+  color: var(--text); font: inherit; line-height: 1.5;
+}
+.clip-input:focus { outline: none; border-color: var(--brass); }
+.clip-status { margin-left: 8px; text-transform: none; letter-spacing: 0; color: var(--muted); }
+.clip-status[data-state="live"] { color: var(--ok); }
+.clip-status[data-state="connecting"] { color: var(--brass); }
+
+/* drop anywhere on the page */
+.drop-overlay {
+  position: fixed; inset: 0; z-index: 50; display: grid; place-items: center;
+  background: rgba(7, 8, 10, 0.82); border: 3px dashed var(--brass); pointer-events: none;
+}
+.drop-overlay[data-ok="false"] { border-color: var(--bad); }
+.drop-overlay[hidden] { display: none; }
+.drop-text { font-size: 1.4rem; text-align: center; padding: 24px; max-width: 28ch; }
 /* the screen that arrives (Settings opening, or the main screen coming back) eases in once */
 #app-view > :not([hidden]) { animation: sheet-in 0.36s cubic-bezier(0.2, 0.8, 0.2, 1); }
 

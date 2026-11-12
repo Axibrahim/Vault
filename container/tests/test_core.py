@@ -301,10 +301,12 @@ def test_hub_wait_times_out():
 
 def test_registry_lifecycle():
     registry = TransferRegistry()
-    transfer_id = registry.create("u", "from", "to", "hash")
+    transfer_id, superseded = registry.create("u", "from", "to", "hash")
     uuid.UUID(transfer_id)
+    assert superseded == []
     item = registry.get("u", transfer_id)
     assert (item["from"], item["to"], item["offer_hash"], item["status"]) == ("from", "to", "hash", "offered")
+    assert item["kind"] == "files"
     assert registry.active_count("u") == 1
     assert registry.active_count("someone-else") == 0
 
@@ -312,22 +314,23 @@ def test_registry_lifecycle():
     assert registry.mark_answered("u", transfer_id) is False
     assert registry.mark_answered("u", "missing") is False
 
-    registry.remove("u", transfer_id)
-    registry.remove("u", transfer_id)                       # removing twice is harmless
-    assert registry.get("u", transfer_id) is None
+    assert registry.advance("u", transfer_id, "completed") == "moved"
+    assert registry.advance("u", transfer_id, "failed") == "already"       # ending twice is harmless
+    assert registry.get("u", transfer_id) is None                          # finished transfers are no longer live
+    assert registry.lookup("u", transfer_id)["status"] == "completed"      # but they are remembered for a while
     assert registry.active_count("u") == 0
 
 
 def test_registry_get_returns_a_copy():
     registry = TransferRegistry()
-    transfer_id = registry.create("u", "a", "b", "h")
+    transfer_id, _ = registry.create("u", "a", "b", "h")
     registry.get("u", transfer_id)["status"] = "hacked"
     assert registry.get("u", transfer_id)["status"] == "offered"
 
 
 def test_registry_counts_ice_messages_up_to_a_limit():
     registry = TransferRegistry()
-    transfer_id = registry.create("u", "a", "b", "h")
+    transfer_id, _ = registry.create("u", "a", "b", "h")
     assert registry.note_ice("u", transfer_id, 2) is True
     assert registry.note_ice("u", transfer_id, 2) is True
     assert registry.note_ice("u", transfer_id, 2) is False
@@ -336,9 +339,10 @@ def test_registry_counts_ice_messages_up_to_a_limit():
 
 def test_registry_forgets_idle_transfers():
     registry = TransferRegistry(idle_ttl=0.05)
-    transfer_id = registry.create("u", "a", "b", "h")
+    transfer_id, _ = registry.create("u", "a", "b", "h")
     time.sleep(0.1)
     assert registry.get("u", transfer_id) is None
+    assert registry.lookup("u", transfer_id)["status"] == "expired"
     assert registry.active_count("u") == 0
 
 

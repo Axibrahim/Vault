@@ -8,10 +8,10 @@ from flask import Blueprint, g, jsonify, request
 from google.api_core.exceptions import AlreadyExists
 from google.cloud.firestore_v1.base_query import FieldFilter
 
-from core.deviceauth import make_challenge
+from core.deviceauth import device_has_expired, make_challenge
 from core.extensions import limiter
 from core.firebase_setup import get_db
-from core.signaling import board
+from core.signaling import board, end_device_transfers, registry
 from routes.auth import fresh_login_required, login_required
 
 bp = Blueprint("devices", __name__, url_prefix="/api/devices")
@@ -127,6 +127,10 @@ def _revoke_in_txn(transaction, user_ref, device_ref):
 
     return kind, max(desktops, 0)
 
+def _drop_device(uid, device_id):
+    """A removed device must vanish from the presence list and lose its running transfers at once."""
+    board.forget(uid, device_id)
+    end_device_transfers(uid, device_id)
 
 def _revoke_active_phones(user_ref):
     """When the LAST computer is removed, the phones it vouched for are removed too."""
@@ -134,6 +138,7 @@ def _revoke_active_phones(user_ref):
     for doc in phones:
         if doc.to_dict().get("status") == "active":
             doc.reference.update({"status": "revoked", "revoked_at": firestore.SERVER_TIMESTAMP})
+            _drop_device(user_ref.id, doc.id)
     user_ref.update({"phone_count": 0})
 
 
@@ -182,10 +187,11 @@ def presence():
     if not board.known(g.uid, device_id):
         snapshot = get_db().collection("users").document(g.uid).collection("devices").document(device_id).get()
         device = snapshot.to_dict() if snapshot.exists else None
-        if not device or device.get("status") != "active":
+        if not device or device.get("status") != "active" or device_has_expired(device):
             return jsonify(error="Not found"), 404
 
     board.beat(g.uid, device_id, state)
+    registry.touch_device(g.uid, device_id)        # an online device keeps its running transfers alive
     return jsonify(presence=board.snapshot(g.uid))
 
 
@@ -249,7 +255,7 @@ def revoke_device(device_id):
     except DeviceNotFound:
         return jsonify(error="Not found"), 404
 
-    board.forget(g.uid, device_id)
+    _drop_device(g.uid, device_id)
     if kind == "desktop" and desktops_left == 0:
         _revoke_active_phones(user_ref)
 

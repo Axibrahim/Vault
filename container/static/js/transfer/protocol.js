@@ -45,11 +45,12 @@ export function validateManifest(raw) {
     seen.add(f.id);
     if (!isUint(f.size, MAX_FILE_SIZE)) throw new Error("Bad file size");
     if (typeof f.name !== "string") throw new Error("Bad file name");
+    if (!isHash(f.digest)) throw new Error("Bad file digest");     // the SHA-256 the file must match when it is complete
 
     total += f.size;
     const name = safeFileName(f.name);
     const type = cleanMime(f.type, name);
-    return { id: f.id, name, size: f.size, type, kind: classify(name, type) };
+    return { id: f.id, name, size: f.size, type, digest: f.digest, kind: classify(name, type) };
   });
 
   if (!isUint(total, MAX_FILE_SIZE)) throw new Error("Bad total size");
@@ -104,6 +105,10 @@ export function parseFileMessage(text) {
   if (msg.t === "ack") {
     if (!isUint(msg.i, 2 ** 31)) throw new Error("Bad ack");
     return { t: "ack", i: msg.i };
+  }
+    if (msg.t === "verify") {                      // "still checking the saved file", so a long check is not mistaken for a stall
+    if (!isUint(msg.i, 2 ** 31)) throw new Error("Bad verify message");
+    return { t: "verify", i: msg.i };
   }
   if (msg.t === "done") return { t: "done" };
   if (msg.t === "error") return { t: "error", reason: String(msg.reason ?? "").slice(0, 80) };

@@ -5,7 +5,7 @@ import { withReauth } from "../core/auth.js";
 import { folderPermission, getFolder } from "../device/folder.js";
 import { $, every, setStatus, stopTimer } from "../ui/dom.js";
 import { loadHistory } from "../ui/history.js";
-import { issueFor, renderPeers, sessionSummary, stateOf } from "../ui/peers.js";
+import { dropState, issueFor, renderPeers, sessionSummary, stateOf } from "../ui/peers.js";
 import { hideTransfer, onTransferCancel, onTransferResume, showTransfer } from "../ui/transfer.js";
 import { saveToFiles, saveToGallery, isIos } from "./save.js";
 import { formatBytes } from "./safety.js";
@@ -120,6 +120,18 @@ function makeUi(role, uid) {
       refreshHistory(2000);       // the sender records the transfer a moment after it finishes
       return role === "phone" ? showReceivedOnPhone(results) : showReceivedOnDesktop(uid, results);
     },
+    // the shared text box
+    textChanged(body) {
+      if ($("clip-input").value !== body) $("clip-input").value = body;
+    },
+    textStatus(status) {
+      const peer = peers.find((p) => p.id === selectedId);
+      const name = peer ? peer.name : "the other device";
+      $("clip-status").dataset.state = status;
+      $("clip-status").textContent = status === "live"
+        ? `Live with ${name}`
+        : status === "connecting" ? "Connecting…" : `Waiting for ${name} to be online`;
+    },
     sent(count, total) {
       keepAwake(false);
       showTransfer("received", `Sent ${count} file${count === 1 ? "" : "s"}`, formatBytes(total));
@@ -155,6 +167,8 @@ function paint() {
   });
   $("session-dot").dataset.state = summary.state;
   $("session-title").textContent = summary.text;
+  // the text box keeps a live link to the chosen device for as long as that device is online
+  if (session) session.syncText(peer ? peer.id : null, peerState !== "offline");
 
   // a short message only when the picture changes, never on every beat
   const key = `${peer ? peer.id : ""}:${summary.state}:${ownNow}`;
@@ -221,12 +235,15 @@ function syncSendBoxes() {
   const hasPeer = peers.length > 0;
   $("send-box").hidden = running.role !== "desktop" || !hasPeer;
   $("phone-send").hidden = running.role !== "phone" || !hasPeer;
+  $("clip-box").hidden = !hasPeer;
 }
 
 // ---------------------------------------------------------------- start / stop
 
 export function deactivateTransfers() {
   if (session) session.stop();
+  $("clip-box").hidden = true;
+  $("clip-input").value = "";               // shared text is never kept after leaving the screen
   session = null;
   running = null;
   stopPresence();
@@ -257,6 +274,7 @@ export function activateTransfers({ role, uid, identity, devices }) {
 
   running = { role, uid, deviceId: identity.deviceId };
   session = new TransferSession({
+    dialsText: role === "desktop",
     identity,
     uid,
     peers,
@@ -295,6 +313,22 @@ function startSending(files) {
   session.send(files, target.id).catch((err) => showTransfer("interrupted", "Could not send", err.message, null, false));
 }
 
+// ---------------------------------------------------------------- dropping files
+
+// What a drop would do right now (and what to tell the person if it cannot happen).
+function currentDrop() {
+  const peer = peers.find((p) => p.id === selectedId) || null;
+  return dropState({
+    role: running ? running.role : null,
+    peer,
+    peerState: peer && presenceLoaded ? stateOf(presence, peer.id) : "offline",
+    ownState: ownNow,
+    busy: Boolean(session && session.busy),
+  });
+}
+
+const hasFiles = (event) => Boolean(event.dataTransfer && [...(event.dataTransfer.types || [])].includes("Files"));
+
 function dropped(event) {
   event.preventDefault();
   $("send-box").classList.remove("over");
@@ -308,6 +342,48 @@ function dropped(event) {
   if (skippedFolder) setStatus("Folders can't be sent directly. Zip the folder first, then send the zip file.");
   startSending(files);
 }
+
+// The whole page is the drop target. Dropping a file ANYWHERE must never make the browser open it
+// (that would leave Vault and end the session), and a file is only sent when the session is ready.
+function wireDropTarget() {
+  const overlay = $("drop-overlay");
+  let depth = 0;
+  const hide = () => { depth = 0; overlay.hidden = true; };
+
+  document.addEventListener("dragenter", (event) => {
+    if (!hasFiles(event)) return;
+    event.preventDefault();
+    depth += 1;
+    const drop = currentDrop();
+    overlay.dataset.ok = String(drop.ok);
+    $("drop-text").textContent = drop.message;
+    overlay.hidden = false;
+  });
+  document.addEventListener("dragover", (event) => {
+    if (!hasFiles(event)) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = currentDrop().ok ? "copy" : "none";
+  });
+  document.addEventListener("dragleave", (event) => {
+    if (!hasFiles(event)) return;
+    depth = Math.max(0, depth - 1);
+    if (depth === 0) overlay.hidden = true;
+  });
+  document.addEventListener("drop", (event) => {
+    if (!hasFiles(event)) return;
+    event.preventDefault();
+    hide();
+    const drop = currentDrop();
+    if (!drop.ok) {
+      setStatus(drop.message);
+      return;
+    }
+    dropped(event);
+  });
+  window.addEventListener("dragend", hide);
+}
+
+// ---------------------------------------------------------------- one-time wiring
 
 // Called once when the page starts. `refresh` re-reads the account and redraws the screen.
 export function initTransfers(refresh) {
@@ -324,11 +400,23 @@ export function initTransfers(refresh) {
   wire("send-btn", "send-input");
   wire("send-photos-btn", "send-photos-input");
   wire("send-files-btn", "send-files-input");
+  wireDropTarget();
 
-  const zone = $("send-box");
-  zone.addEventListener("dragover", (e) => { e.preventDefault(); zone.classList.add("over"); });
-  zone.addEventListener("dragleave", () => zone.classList.remove("over"));
-  zone.addEventListener("drop", dropped);
+  // shared text box
+  $("clip-input").addEventListener("input", () => { if (session) session.setText($("clip-input").value); });
+  $("clip-clear").addEventListener("click", () => {
+    $("clip-input").value = "";
+    if (session) session.setText("");
+  });
+  $("clip-copy").addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText($("clip-input").value);
+      setStatus("Copied");
+    } catch (err) {
+      $("clip-input").select();                    // the browser refused: the text is selected, press Ctrl+C / Copy
+      setStatus("Select and copy the text");
+    }
+  });
 
   $("incoming-accept").addEventListener("click", () => pendingAnswer && pendingAnswer(true));
   $("incoming-decline").addEventListener("click", () => pendingAnswer && pendingAnswer(false));

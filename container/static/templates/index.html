@@ -182,7 +182,21 @@
             <p id="claim-fingerprint" class="code small"></p>
           </div>
         </div>
+        
+        <div id="clip-box" class="pairbox" hidden>
+        <p class="eyebrow">Shared text <span id="clip-status" class="clip-status" data-state="offline" role="status">Waiting</span></p>
+        <label for="clip-input" class="sr-only">Text shared between your devices</label>
+        <textarea id="clip-input" class="clip-input" maxlength="100000" rows="5" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="Type or paste a link, note or letter here. It appears on your other device."></textarea>
+        <div class="row">
+          <button id="clip-copy" type="button" class="btn ghost small">Copy</button>
+          <button id="clip-clear" type="button" class="btn ghost small">Clear</button>
+        </div>
+        <p class="hint">Goes straight between your devices and is never stored. It disappears when you close Vault.</p>
+      </div>
 
+      <div id="drop-overlay" class="drop-overlay" data-ok="false" aria-hidden="true" hidden>
+        <p id="drop-text" class="drop-text"></p>
+      </div>
         <div id="phone-view" hidden>
           <p class="eyebrow live"><i aria-hidden="true"></i>Paired</p>
           <h2 id="phone-view-name"></h2>

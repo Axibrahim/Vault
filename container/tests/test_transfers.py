@@ -19,15 +19,6 @@ def sha(text):
     return hashlib.sha256(text.encode()).hexdigest()
 
 
-@pytest.fixture
-def pair(desktop, seed, db):
-    """An account with a paired phone. Returns (computer, phone)."""
-    phone = Device("phone", "My phone")
-    seed.device(phone)
-    db.collection("users").document("user-1").update({"account_state": "phone_paired"})
-    return desktop, phone
-
-
 def send_offer(api, sender, target, offer_sdp=SDP, **overrides):
     body = api.signed(
         sender, "offer", [sender.device_id, target.device_id, sha(offer_sdp)],
@@ -44,7 +35,7 @@ def start_transfer(api, sender, target):
 
 
 def send_answer(api, responder, transfer_id, sdp="v=0 answer sdp goes here...", **overrides):
-    offer_hash = registry.get("user-1", transfer_id)["offer_hash"]
+    offer_hash = registry.lookup("user-1", transfer_id)["offer_hash"]
     body = api.signed(
         responder, "answer", [transfer_id, offer_hash, sha(sdp)], sdp=sdp,
     )
@@ -274,11 +265,13 @@ def test_offer_creates_a_transfer_and_notifies_the_other_device(api, pair):
     assert event["sdp"] == SDP
 
 
-def test_offer_limits_active_transfers(api, pair, flask_app, monkeypatch):
+def test_offer_limits_active_transfers(api, pair, seed, flask_app, monkeypatch):
     desktop, phone = pair
+    second_phone = Device("phone", "Second phone")
+    seed.device(second_phone)
     monkeypatch.setitem(flask_app.config, "MAX_ACTIVE_TRANSFERS", 1)
     assert send_offer(api, phone, desktop).status_code == 201
-    response = send_offer(api, phone, desktop)
+    response = send_offer(api, second_phone, desktop)
     assert response.status_code == 429
     assert response.get_json() == {"error": "Too many transfers at once"}
 
@@ -482,23 +475,34 @@ def test_close_signature_covers_the_reason(api, pair):
     assert api.post(f"/api/transfers/{transfer_id}/close", json=body).status_code == 403
 
 
-@pytest.mark.parametrize("reason", ["done", "declined", "cancelled", "error"])
-def test_close_removes_the_transfer_and_tells_the_peer(api, pair, reason):
+@pytest.mark.parametrize("reason,state", [("declined", "declined"), ("cancelled", "cancelled"), ("error", "failed")])
+def test_close_ends_the_transfer_and_tells_the_peer(api, pair, reason, state):
     desktop, phone = pair
     transfer_id = start_transfer(api, phone, desktop)
     assert send_close(api, desktop, transfer_id, reason=reason).status_code == 200
     assert registry.get("user-1", transfer_id) is None
+    assert registry.lookup("user-1", transfer_id)["status"] == state
 
     event = poll(api, phone)["events"][-1]
     assert event == {"seq": event["seq"], "type": "closed", "transferId": transfer_id, "reason": reason}
 
 
+def test_the_sender_finishes_an_answered_transfer(api, pair):
+    desktop, phone = pair
+    transfer_id = start_transfer(api, phone, desktop)
+    assert send_answer(api, desktop, transfer_id).status_code == 200
+    assert send_close(api, phone, transfer_id, reason="done").status_code == 200
+    assert registry.lookup("user-1", transfer_id)["status"] == "completed"
+    assert poll(api, desktop)["events"][-1]["reason"] == "done"
+
+
 def test_close_defaults_to_done(api, pair):
     desktop, phone = pair
     transfer_id = start_transfer(api, phone, desktop)
-    body = api.signed(desktop, "close", [transfer_id, "done"])
+    assert send_answer(api, desktop, transfer_id).status_code == 200
+    body = api.signed(phone, "close", [transfer_id, "done"])
     assert api.post(f"/api/transfers/{transfer_id}/close", json=body).status_code == 200
-    assert poll(api, phone)["events"][-1]["reason"] == "done"
+    assert poll(api, desktop)["events"][-1]["reason"] == "done"
 
 
 # ---------- GET /api/transfers/events ----------

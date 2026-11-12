@@ -14,6 +14,7 @@ import secrets
 import threading
 import time
 import uuid
+from datetime import datetime, timezone
 
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes
@@ -148,6 +149,21 @@ def signature_is_valid(public_jwk, message, signature_b64url):
     ):
         return False
 
+def device_has_expired(device):
+    """True if the device record carries an `expires_at` that has passed (or one we cannot read).
+
+    Devices have no expiry unless the field is set. When it is, it must be a date in the future.
+    Anything unreadable counts as expired: the check fails closed.
+    """
+    expires = device.get("expires_at")
+    if expires is None:
+        return False
+    if not isinstance(expires, datetime):
+        return True
+    if expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)
+    return expires <= datetime.now(timezone.utc)
+
 
 def fingerprint(public_jwk):
     """A short code both screens can show so a human can compare them."""
@@ -205,6 +221,9 @@ def verify_device_proof(
         device.get("type") not in device_types
         or device.get("status") != "active"
     ):
+        return None
+
+    if device_has_expired(device):
         return None
 
     challenge = data.get("challenge")

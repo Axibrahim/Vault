@@ -9,22 +9,19 @@ can pose as one of your devices.
 import base64
 import hashlib
 import hmac
-import re
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
-from urllib.parse import quote
 
-import requests
 from firebase_admin import firestore
 from flask import Blueprint, current_app, g, jsonify, request
 from google.api_core.exceptions import AlreadyExists
 from google.cloud.firestore_v1.base_query import FieldFilter
 
-from core.deviceauth import fingerprint, verify_device_proof
+from core.deviceauth import device_has_expired, fingerprint, verify_device_proof
 from core.extensions import limiter
 from core.firebase_setup import get_db
-from core.signaling import hub, registry
+from core.signaling import ANSWERED, CANCELLED, COMPLETED, DECLINED, FAILED, hub, registry
 from routes.auth import login_required
 
 bp = Blueprint("transfers", __name__, url_prefix="/api/transfers")
@@ -32,9 +29,10 @@ bp = Blueprint("transfers", __name__, url_prefix="/api/transfers")
 MAX_SDP_CHARS = 16000
 MAX_CANDIDATE_CHARS = 2000
 MAX_ICE_PER_TRANSFER = 300
-CLOSE_REASONS = {"done", "declined", "cancelled", "error"}
-CLOUDFLARE_TURN_URL = "https://rtc.live.cloudflare.com/v1/turn/keys/{key_id}/credentials/generate-ice-servers"
-CLOUDFLARE_TIMEOUT_SECONDS = 4
+OFFER_KINDS = {"files", "clip"}       # "clip" is the live shared text box; everything else is a file transfer
+# what a device says when it closes a transfer -> the state the transfer moves to
+CLOSE_STATES = {"done": COMPLETED, "declined": DECLINED, "cancelled": CANCELLED, "error": FAILED}
+CLOSE_REASONS = set(CLOSE_STATES)
 HISTORY_DAYS = 30
 HISTORY_LIMIT = 50
 MAX_RECORD_FILES = 100_000
@@ -59,46 +57,16 @@ def _user_ref():
 def _active_device(user_ref, device_id):
     snapshot = user_ref.collection("devices").document(device_id).get()
     device = snapshot.to_dict() if snapshot.exists else None
-    return device if device and device.get("status") == "active" else None
+    if not device or device.get("status") != "active" or device_has_expired(device):
+        return None
+    return device
 
 
 def _urls(text):
     return [part.strip() for part in text.split(",") if part.strip()]
 
 
-def _cloudflare_servers(cfg):
-    """Short-lived relay credentials from Cloudflare.
-
-    Returns [] when the call fails, so devices on the same network can still connect directly.
-    The relay only ever carries data that is already end-to-end encrypted (DTLS).
-    """
-    try:
-        reply = requests.post(
-            CLOUDFLARE_TURN_URL.format(key_id=quote(cfg["CLOUDFLARE_TURN_KEY_ID"], safe="")),
-            headers={"Authorization": f"Bearer {cfg['CLOUDFLARE_TURN_API_TOKEN']}"},
-            json={"ttl": cfg["TURN_TTL_SECONDS"]},
-            timeout=CLOUDFLARE_TIMEOUT_SECONDS,
-        )
-        reply.raise_for_status()
-        servers = reply.json()["iceServers"]
-        if isinstance(servers, dict):
-            servers = [servers]
-        for server in servers:
-            if not isinstance(server["urls"], list):
-                raise ValueError("unexpected address list")
-    except (requests.RequestException, ValueError, KeyError, TypeError) as err:
-        current_app.logger.warning("Cloudflare TURN unavailable: %s", type(err).__name__)
-        return []
-
-    # Browsers block port 53, so those addresses would only add a timeout.
-    return [
-        {**server, "urls": [url for url in server["urls"] if not re.search(r":53(\?|$)", url)]}
-        for server in servers
-    ]
-
-
 @bp.get("/ice-servers")
-@limiter.limit("30 per minute")
 @login_required
 def ice_servers():
     """Helper servers the browsers use to find a path to each other."""
@@ -122,9 +90,6 @@ def ice_servers():
             "credential": base64.b64encode(digest).decode(),
         })
 
-    if cfg["CLOUDFLARE_TURN_KEY_ID"]:
-        servers.extend(_cloudflare_servers(cfg))
-
     return jsonify(iceServers=servers)
 
 
@@ -137,9 +102,12 @@ def offer():
     from_id = _uuid_or_none(data.get("deviceId"))
     to_id = _uuid_or_none(data.get("toDeviceId"))
     sdp = data.get("sdp")
+    kind = data.get("kind", "files")
     if not from_id or not to_id or from_id == to_id:
         return jsonify(error="Invalid request"), 400
     if not isinstance(sdp, str) or not 20 <= len(sdp) <= MAX_SDP_CHARS:
+        return jsonify(error="Invalid request"), 400
+    if not isinstance(kind, str) or kind not in OFFER_KINDS:
         return jsonify(error="Invalid request"), 400
 
     user_ref = _user_ref()
@@ -147,8 +115,10 @@ def offer():
 
     # The sender must prove it is that device. The signature covers who is
     # sending to whom and a hash of the offer, so none of it can be swapped.
+    # A non-default kind is signed too, so it cannot be changed on the way.
+    signed = [from_id, to_id, offer_hash] + ([] if kind == "files" else [kind])
     sender = verify_device_proof(
-        user_ref, g.uid, data, "offer", [from_id, to_id, offer_hash],
+        user_ref, g.uid, data, "offer", signed,
         device_types=("desktop", "phone"),
     )
     if sender is None:
@@ -157,13 +127,20 @@ def offer():
     if _active_device(user_ref, to_id) is None:
         return jsonify(error="Device not found"), 404
 
-    if registry.active_count(g.uid) >= current_app.config["MAX_ACTIVE_TRANSFERS"]:
+    transfer_id, superseded = registry.create(
+        g.uid, from_id, to_id, offer_hash, kind=kind, limit=current_app.config["MAX_ACTIVE_TRANSFERS"],
+    )
+    # A fresh signed offer replaces the older transfer between these two devices: the receiver is told,
+    # so the old connection can never be carried on with its old authorisation.
+    for old_id in superseded:
+        hub.publish(g.uid, to_id, {"type": "closed", "transferId": old_id, "reason": "error"})
+    if transfer_id is None:
         return jsonify(error="Too many transfers at once"), 429
 
-    transfer_id = registry.create(g.uid, from_id, to_id, offer_hash)
     hub.publish(g.uid, to_id, {
         "type": "offer",
         "transferId": transfer_id,
+        "kind": kind,
         "from": from_id,
         "fromName": sender["name"],
         "fromPublicKey": sender["public_key"],
@@ -296,7 +273,7 @@ def close(transfer_id):
     transfer_id = _uuid_or_none(transfer_id)
     device_id = _uuid_or_none(data.get("deviceId"))
 
-    transfer = registry.get(g.uid, transfer_id) if transfer_id else None
+    transfer = registry.lookup(g.uid, transfer_id) if transfer_id else None
     if transfer is None:
         return jsonify(error="Not found"), 404
 
@@ -320,16 +297,25 @@ def close(transfer_id):
     if proof is None:
         return jsonify(error="Device check failed"), 403
 
-    peer = transfer["to"] if device_id == transfer["from"] else transfer["from"]
+    # Only the device that sent the files can say the transfer is complete.
+    if CLOSE_STATES[reason] == COMPLETED and device_id != transfer["from"]:
+        return jsonify(error="Device check failed"), 403
 
-    registry.remove(g.uid, transfer_id)
-    hub.publish(g.uid, peer, {
-        "type": "closed",
-        "transferId": transfer_id,
-        "reason": reason,
-    })
+    outcome = registry.advance(g.uid, transfer_id, CLOSE_STATES[reason])
+    if outcome == "unknown":
+        return jsonify(error="Not found"), 404
+    if outcome == "illegal":
+        return jsonify(error="Transfer is not in a state that allows this"), 409
 
-    return jsonify(status="ok")
+    if outcome == "moved":
+        peer = transfer["to"] if device_id == transfer["from"] else transfer["from"]
+        hub.publish(g.uid, peer, {
+            "type": "closed",
+            "transferId": transfer_id,
+            "reason": reason,
+        })
+
+    return jsonify(status="ok")                # closing a transfer that already ended is harmless
 
 
 @bp.get("/events")
@@ -378,6 +364,16 @@ def record():
     )
     if sender is None:
         return jsonify(error="Device check failed"), 403
+
+    # Only a real, running transfer between these two devices can be written to the history.
+    transfer = registry.get(g.uid, transfer_id)
+    if (
+        transfer is None
+        or transfer["status"] != ANSWERED
+        or transfer["kind"] != "files"
+        or (transfer["from"], transfer["to"]) != (from_id, to_id)
+    ):
+        return jsonify(error="Not found"), 404
 
     receiver = _active_device(user_ref, to_id)
     if receiver is None:

@@ -3,6 +3,8 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
+from core.signaling import registry
+
 from tests.helpers import Device
 
 
@@ -13,8 +15,16 @@ def history_docs(db):
     }
 
 
+def running_transfer(sender, receiver, answered=True):
+    """A transfer between two devices that is really running (only those can be written to the history)."""
+    transfer_id, _ = registry.create("user-1", sender.device_id, receiver.device_id, "offer-hash")
+    if answered:
+        registry.mark_answered("user-1", transfer_id)
+    return transfer_id
+
+
 def record_body(api, sender, receiver, files=3, size=4096, transfer_id=None):
-    transfer_id = transfer_id or str(uuid.uuid4())
+    transfer_id = transfer_id or running_transfer(sender, receiver)
     body = api.signed(
         sender, "record", [transfer_id, receiver.device_id, str(files), str(size)],
         transferId=transfer_id, toDeviceId=receiver.device_id, files=files, bytes=size,
@@ -94,12 +104,60 @@ def test_record_needs_the_senders_signature(api, desktop, phone):
     assert api.post("/api/transfers/record", json=body).status_code == 403
 
 
-def test_record_needs_an_active_receiver(api, desktop):
-    stranger = Device("phone")
-    _, body = record_body(api, desktop, stranger)
+def test_record_needs_an_active_receiver(api, desktop, phone, seed):
+    _, body = record_body(api, desktop, phone)
+    seed.device(phone, status="revoked")
     response = api.post("/api/transfers/record", json=body)
     assert response.status_code == 404
     assert response.get_json() == {"error": "Device not found"}
+
+
+def test_record_needs_a_running_transfer(api, desktop, phone, db):
+    unknown = str(uuid.uuid4())                                   # a transfer that never existed
+    _, body = record_body(api, desktop, phone, transfer_id=unknown)
+    response = api.post("/api/transfers/record", json=body)
+    assert response.status_code == 404
+    assert response.get_json() == {"error": "Not found"}
+    assert history_docs(db) == {}
+
+
+def test_record_refuses_a_transfer_that_was_never_answered(api, desktop, phone, db):
+    offered = running_transfer(desktop, phone, answered=False)
+    _, body = record_body(api, desktop, phone, transfer_id=offered)
+    assert api.post("/api/transfers/record", json=body).status_code == 404
+    assert history_docs(db) == {}
+
+
+def test_record_refuses_a_transfer_that_is_over(api, desktop, phone, db):
+    finished = running_transfer(desktop, phone)
+    registry.advance("user-1", finished, "cancelled")
+    _, body = record_body(api, desktop, phone, transfer_id=finished)
+    assert api.post("/api/transfers/record", json=body).status_code == 404
+    assert history_docs(db) == {}
+
+
+def test_record_must_name_the_real_devices_of_the_transfer(api, desktop, phone, seed, db):
+    other = Device("phone", "Other phone")
+    seed.device(other)
+    transfer_id = running_transfer(desktop, phone)
+    _, body = record_body(api, desktop, other, transfer_id=transfer_id)      # same transfer, different receiver
+    assert api.post("/api/transfers/record", json=body).status_code == 404
+    assert history_docs(db) == {}
+
+
+def test_record_cannot_be_written_by_the_receiving_side(api, desktop, phone, db):
+    transfer_id = running_transfer(desktop, phone)
+    _, body = record_body(api, phone, desktop, transfer_id=transfer_id)      # roles swapped
+    assert api.post("/api/transfers/record", json=body).status_code == 404
+    assert history_docs(db) == {}
+
+
+def test_a_clip_link_cannot_be_recorded_as_a_file_transfer(api, desktop, phone, db):
+    transfer_id, _ = registry.create("user-1", desktop.device_id, phone.device_id, "h", kind="clip")
+    registry.mark_answered("user-1", transfer_id)
+    _, body = record_body(api, desktop, phone, transfer_id=transfer_id)
+    assert api.post("/api/transfers/record", json=body).status_code == 404
+    assert history_docs(db) == {}
 
 
 # ---------- GET /api/transfers/history ----------

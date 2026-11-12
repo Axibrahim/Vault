@@ -2,6 +2,7 @@
 //   FolderSink  the computer: straight into the folder the person chose (streams to disk, any size)
 //   PhoneSink   the phone: a private scratch area, then the person saves to the gallery / Files
 import { BLOCK_SIZE } from "./protocol.js";
+import { verifyStoredFile } from "./blocks.js";
 import { safeFileName, uniqueName, cleanMime } from "./safety.js";
 
 // ---------- computer ----------
@@ -34,15 +35,24 @@ export class FolderSink {
       this.reserved.add(name);
       const handle = await this.dir.getFileHandle(name, { create: true });
       const writable = await handle.createWritable();
-      return { name, writable };
+      return { name, writable, handle };
     });
     this.lock = job.catch(() => {});
 
-    return job.then(({ name, writable }) => ({
+    return job.then(({ name, writable, handle }) => ({
       name,
       writeBlock: (index, bytes) => writable.write({ type: "write", position: index * BLOCK_SIZE, data: bytes }),
-      finish: async () => {
+      // Closes the file, then reads it back from disk and checks it against the verified block hashes.
+      // A file that does not match is deleted: a damaged file is never left in the folder.
+      finish: async (hashes) => {
         await writable.close();
+                try {
+          await verifyStoredFile(await handle.getFile(), meta.size, hashes);
+        } catch (err) {
+          try { await this.dir.removeEntry(name); } catch (e) { /* already gone */ }
+          this.reserved.delete(name);
+          throw err;
+        }
         return { name };
       },
       abort: async () => {
@@ -98,9 +108,16 @@ export class PhoneSink {
       return {
         name,
         writeBlock: (index, bytes) => writable.write({ type: "write", position: index * BLOCK_SIZE, data: bytes }),
-        finish: async () => {
+        finish: async (hashes) => {
           await writable.close();
           const stored = await handle.getFile();
+                    try {
+            await verifyStoredFile(stored, meta.size, hashes);
+          } catch (err) {
+            await dir.removeEntry(partName).catch(() => {});
+            this.used.delete(name);
+            throw err;
+          }
           return {
             name,
             file: new File([stored], name, { type }),
@@ -120,7 +137,17 @@ export class PhoneSink {
     return {
       name,
       writeBlock: async (index, bytes) => { parts[index] = new Blob([bytes]); },
-      finish: async () => ({ name, file: new File(parts, name, { type }), discard: () => {} }),
+      finish: async (hashes) => {
+        const file = new File(parts, name, { type });
+        try {
+          await verifyStoredFile(file, meta.size, hashes);
+        } catch (err) {
+          parts.length = 0;
+          this.used.delete(name);
+          throw err;
+        }
+        return { name, file, discard: () => {} };
+      },
       abort: async () => { parts.length = 0; this.used.delete(name); },
     };
   }

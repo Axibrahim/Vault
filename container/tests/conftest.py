@@ -156,5 +156,14 @@ def desktop(seed, login):
     uid = login()
     seed.user(uid, "desktop_enrolled")
     device = Device("desktop", "Home PC")
-    seed.device(device, uid)
+    return device
+
+
+@pytest.fixture
+def pair(desktop, seed, db):
+    """An account with a paired phone. Returns (computer, phone)."""
+    phone = Device("phone", "My phone")
+    seed.device(phone)
+    db.collection("users").document("user-1").update({"account_state": "phone_paired"})
+    return desktop, phone
     return device

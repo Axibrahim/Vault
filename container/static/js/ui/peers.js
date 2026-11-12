@@ -27,6 +27,17 @@ export function sessionSummary({ role, peer, peerState, ownState }) {
   return { state: peerState, text: issueFor(peer, peerState) };
 }
 
+// Whether a dragged file may be dropped right now, and the sentence to show about it.
+// Files can only be sent from a computer, to a device that is ready, and one transfer at a time.
+export function dropState({ role, peer, peerState, ownState, busy }) {
+  if (role !== "desktop") return { ok: false, message: "Files are sent from your computer." };
+  if (!peer) return { ok: false, message: "Pair a phone to send files to first." };
+  if (busy || ownState === "busy") return { ok: false, message: "Wait for the current transfer to finish." };
+  if (ownState === "blocked") return { ok: false, message: "Allow folder access on this computer first." };
+  if (peerState !== "ready") return { ok: false, message: issueFor(peer, peerState) };
+  return { ok: true, message: `Drop to send to ${peer.name}` };
+}
+
 // Draws the list. Click a row to choose who files go to (only when there is more than one).
 // Pass onRemove to show a Remove button on every row.
 export function renderPeers(list, { peers, presence, selectedId, onSelect, onRemove }) {

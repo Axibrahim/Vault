@@ -30,12 +30,15 @@ async function createSignedBody(identity, action, parts, extra = {}) {
   };
 }
 
-export async function sendSignedOffer(identity, toDeviceId, sdp) {
+// kind "clip" is the live shared text box. It is part of what is signed, so it cannot be changed on the way.
+export async function sendSignedOffer(identity, toDeviceId, sdp, kind = "files") {
+  const parts = [identity.deviceId, toDeviceId, await sha256Hex(sdp)];
+  if (kind !== "files") parts.push(kind);
   const body = await createSignedBody(
     identity,
     "offer",
-    [identity.deviceId, toDeviceId, await sha256Hex(sdp)],
-    { toDeviceId, sdp }
+    parts,
+    kind === "files" ? { toDeviceId, sdp } : { toDeviceId, sdp, kind }
   );
 
   return api("POST", "/api/transfers/offer", body);
