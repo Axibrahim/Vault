@@ -122,12 +122,16 @@ function makeUi(role, uid) {
     },
     // the shared text box
     textChanged(body) {
-      if ($("clip-input").value !== body) $("clip-input").value = body;
+      if ($("clip-input").value === body) return;
+      $("clip-input").value = body;
+      // text arrived while the sheet is closed: the Text button pulses until it is opened
+      if (body && document.body.dataset.clip !== "open") $("clip-fab").dataset.unread = "true";
     },
     textStatus(status) {
       const peer = peers.find((p) => p.id === selectedId);
       const name = peer ? peer.name : "the other device";
       $("clip-status").dataset.state = status;
+      $("clip-fab").dataset.state = status;
       $("clip-status").textContent = status === "live"
         ? `Live with ${name}`
         : status === "connecting" ? "Connecting…" : `Waiting for ${name} to be online`;
@@ -142,18 +146,33 @@ function makeUi(role, uid) {
 
 // ---------------------------------------------------------------- status dots
 
-// This device's own state: ready, busy with a transfer, or (computers only) no folder access yet.
 async function ownState() {
   if (session && session.busy) return "busy";
-  if (running.role === "desktop") {
-    const folder = await getFolder(running.uid);
-    if (!folder || (await folderPermission(folder)) !== "granted") return "blocked";
-  }
+  if (running.role === "desktop" && !(await folderGranted())) return "blocked";
   return "ready";
 }
 
+// Asking the browser about the folder on every beat is wasteful, so the answer is kept for a few seconds.
+// Choosing or allowing a folder reloads the screen, which starts a fresh check.
+const FOLDER_CHECK_MS = 5_000;
+let folderCheck = { at: 0, ok: false };
+
+async function folderGranted() {
+  if (Date.now() - folderCheck.at < FOLDER_CHECK_MS) return folderCheck.ok;
+  const folder = await getFolder(running.uid);
+  const ok = Boolean(folder) && (await folderPermission(folder)) === "granted";
+  folderCheck = { at: Date.now(), ok };
+  return ok;
+}
+
 // Shows the session dot and the device list, and tells the person when something changes.
+let lastPaint = null;     // the last picture drawn: an unchanged picture is not drawn again
+
 function paint() {
+  const paintKey = JSON.stringify([running.role, selectedId, ownNow, presence, peers.map((p) => [p.id, p.name])]);
+  if (paintKey === lastPaint) return;
+  lastPaint = paintKey;
+
   const peer = peers.find((p) => p.id === selectedId) || null;
   const peerState = peer ? stateOf(presence, peer.id) : "offline";
   const summary = sessionSummary({ role: running.role, peer, peerState, ownState: ownNow });
@@ -219,6 +238,8 @@ function startPresence() {
 }
 
 function stopPresence() {
+  lastPaint = null;
+  folderCheck = { at: 0, ok: false };
   if (beatTimer) stopTimer(beatTimer);
   beatTimer = null;
   presence = {};
@@ -248,6 +269,22 @@ function syncSendBoxes() {
   $("send-box").hidden = running.role !== "desktop" || !hasPeer;
   $("phone-send").hidden = running.role !== "phone" || !hasPeer;
   $("clip-box").hidden = !hasPeer;
+  $("clip-fab").hidden = !hasPeer;
+  if (!hasPeer) closeClip();
+}
+
+// On phones the shared text box is a sheet that slides up when the Text button is tapped.
+function openClip() {
+  document.body.dataset.clip = "open";
+  $("clip-fab").setAttribute("aria-expanded", "true");
+  delete $("clip-fab").dataset.unread;
+  setTimeout(() => $("clip-input").focus({ preventScroll: true }), 360);     // after the slide-up
+}
+
+function closeClip() {
+  delete document.body.dataset.clip;
+  $("clip-fab").setAttribute("aria-expanded", "false");
+  $("clip-input").blur();
 }
 
 // ---------------------------------------------------------------- start / stop
@@ -255,6 +292,8 @@ function syncSendBoxes() {
 export function deactivateTransfers() {
   if (session) session.stop();
   $("clip-box").hidden = true;
+  $("clip-fab").hidden = true;
+  closeClip();
   $("clip-input").value = "";               // shared text is never kept after leaving the screen
   session = null;
   running = null;
@@ -416,6 +455,10 @@ export function initTransfers(refresh) {
 
   // shared text box
   $("clip-input").addEventListener("input", () => { if (session) session.setText($("clip-input").value); });
+  $("clip-fab").addEventListener("click", openClip);
+  $("clip-close").addEventListener("click", closeClip);
+  $("clip-backdrop").addEventListener("click", closeClip);
+  document.addEventListener("keydown", (event) => { if (event.key === "Escape") closeClip(); });
   $("clip-clear").addEventListener("click", () => {
     $("clip-input").value = "";
     if (session) session.setText("");
