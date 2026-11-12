@@ -494,10 +494,13 @@ export class TransferSession {
   _wirePc(link) {
     link.pc.onicecandidate = (e) => {
       if (e.candidate && e.candidate.candidate) {
+        console.log("local candidate:", e.candidate.type || e.candidate.candidate.split(" ")[7]);
         link.localIce.push(e.candidate);
         this._flushLocalIce(link);
       }
     };
+    link.pc.onicecandidateerror = (e) => console.warn("ICE error", e.errorCode, e.errorText, e.url);
+    link.pc.oniceconnectionstatechange = () => console.log("ICE state:", link.pc.iceConnectionState);
     link.pc.onconnectionstatechange = () => {
       const state = link.pc.connectionState;
       if (state === "connected") clearTimeout(link.dropTimer);

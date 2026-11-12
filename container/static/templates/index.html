@@ -39,6 +39,11 @@
     <div class="brand"><img class="logo" src="{{ url_for('static', filename='img/logo-mark.svg') }}" alt="" width="28" height="28">VAULT</div>
     <div class="top-actions">
       <div class="chip"><i aria-hidden="true"></i>Device key never leaves this browser</div>
+    </div>
+  </header>
+    <p id="status" class="toast" role="status" aria-live="polite">Loading...</p>
+    <main>
+    <section class="panel">
       <button id="settings-btn" type="button" class="settings-btn" aria-expanded="false" aria-controls="settings-view" hidden>
         <svg class="dial" viewBox="0 0 24 24" aria-hidden="true">
           <g class="dial-ring">
@@ -50,11 +55,6 @@
         </svg>
         <span>Settings</span>
       </button>
-    </div>
-  </header>
-    <p id="status" class="toast" role="status" aria-live="polite">Loading...</p>
-    <main>
-    <section class="panel">
       <section id="login-view" hidden>
         <p class="eyebrow">Private transfer</p>
         <h1>A locked door between your phone and your PC.</h1>

@@ -103,3 +103,23 @@ input:focus { border-color: var(--brass-d); }
 .settings-btn[aria-expanded="true"] .dial-ring { transform: rotate(180deg); transition: transform 0.6s cubic-bezier(0.3, 1.5, 0.5, 1); }
 
 .settings-btn[aria-expanded="true"] .dial-pin { fill: #1a1205; }
+
+/* the Settings button sits in the top-right corner of the main card */
+.panel { position: relative; }
+
+.panel > .settings-btn {
+  position: absolute; top: 14px; right: 14px; z-index: 3;
+  animation: settings-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+
+@keyframes settings-in {
+  from { opacity: 0; transform: translateY(-6px) scale(0.92); }
+  to { opacity: 1; transform: none; }
+}
+
+/* while Settings is open, leave room so the button does not cover the "Done" button */
+body[data-panel="settings"] #settings-view { padding-top: 28px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .panel > .settings-btn { animation: none; }
+}
