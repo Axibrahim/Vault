@@ -234,7 +234,6 @@ export function deactivateTransfers() {
   $("send-box").hidden = true;
   $("phone-send").hidden = true;
   $("peers-box").hidden = true;
-  hideHistory();
 }
 
 // Called by the desktop and phone screens each time they are shown.
