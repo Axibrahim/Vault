@@ -10,6 +10,16 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Vault">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Vault">
+  <meta property="og:title" content="Vault">
+  <meta property="og:description" content="Vault: send photos and videos between your phone and your PC.">
+  <meta property="og:url" content="{{ request.url_root }}">
+  <meta property="og:image" content="{{ url_for('static', filename='img/icon-512.png', _external=True) }}">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Vault">
+  <meta name="twitter:description" content="Vault: send photos and videos between your phone and your PC.">
+  <meta name="twitter:image" content="{{ url_for('static', filename='img/icon-512.png', _external=True) }}">
   <title>Vault</title>
   <link rel="icon" href="{{ url_for('static', filename='img/favicon.svg') }}" type="image/svg+xml">
   <link rel="icon" href="{{ url_for('static', filename='img/favicon.ico') }}" sizes="any">
@@ -199,7 +209,7 @@
         <i aria-hidden="true"></i>Text
       </button>
       <div id="clip-backdrop" class="clip-backdrop" aria-hidden="true"></div>
-      
+
       <div id="drop-overlay" class="drop-overlay" data-ok="false" aria-hidden="true" hidden>
         <p id="drop-text" class="drop-text"></p>
       </div>

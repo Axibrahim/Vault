@@ -66,9 +66,10 @@ def register_security(app):
         resp.headers["Referrer-Policy"] = "no-referrer"     # your URLs are never leaked to other sites
         resp.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
         resp.headers["Cross-Origin-Opener-Policy"] = "same-origin-allow-popups"
+        resp.headers["Cross-Origin-Resource-Policy"] = "same-origin"      # other sites cannot embed our files
 
         if app.config["ENFORCE_HTTPS"]:
-            resp.headers["Strict-Transport-Security"] = "max-age=31536000"
+            resp.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
 
         if request.path.startswith("/api/"):
             resp.headers["Cache-Control"] = "no-store"

@@ -85,8 +85,25 @@ def test_security_headers_on_every_response(api):
     assert response.headers["Referrer-Policy"] == "no-referrer"
     assert "camera=()" in response.headers["Permissions-Policy"]
     assert response.headers["Cross-Origin-Opener-Policy"] == "same-origin-allow-popups"
+    assert response.headers["Cross-Origin-Resource-Policy"] == "same-origin"
     assert "Strict-Transport-Security" not in response.headers      # development: plain http is fine
     assert "no-store" not in response.headers.get("Cache-Control", "")
+
+
+def test_security_txt_says_where_to_report_a_problem(api):
+    response = api.get("/.well-known/security.txt")
+    assert response.status_code == 200
+    assert response.mimetype == "text/plain"
+    text = response.get_data(as_text=True)
+    assert "Contact: https://github.com/Axibrahim/Vault/security/advisories/new" in text
+    assert "Expires: 20" in text
+
+
+def test_the_page_has_share_preview_tags(api):
+    page = api.get("/").get_data(as_text=True)
+    for tag in ('property="og:title"', 'property="og:description"', 'property="og:image"', 'name="twitter:card"'):
+        assert tag in page
+    assert "/static/img/icon-512.png" in page
 
 
 def test_api_responses_are_never_cached(api):
@@ -135,7 +152,7 @@ def test_production_sets_hsts_and_trusts_the_proxy(production_app):
     client = production_app(proxy_hops=1).test_client()
     response = client.get("/", headers={"X-Forwarded-Proto": "https"})
     assert response.status_code == 200
-    assert response.headers["Strict-Transport-Security"] == "max-age=31536000"
+    assert response.headers["Strict-Transport-Security"] == "max-age=31536000; includeSubDomains"
 
 
 def test_production_uses_the_host_cookie_name(production_app):

@@ -1,5 +1,7 @@
-from flask import Flask, jsonify, render_template
 import mimetypes
+from datetime import datetime, timedelta, timezone
+
+from flask import Flask, Response, jsonify, render_template
 from werkzeug.exceptions import HTTPException
 from werkzeug.middleware.proxy_fix import ProxyFix
 
@@ -48,6 +50,17 @@ def create_app():
         resp.headers["Service-Worker-Allowed"] = "/"
         return resp
 
+    @app.get("/.well-known/security.txt")
+    def security_txt():
+        # tells researchers where to report a problem (RFC 9116); "Expires" is always about half a year ahead
+        expires = (datetime.now(timezone.utc) + timedelta(days=180)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        text = (
+            "Contact: https://github.com/Axibrahim/Vault/security/advisories/new\n"
+            f"Expires: {expires}\n"
+            "Preferred-Languages: en\n"
+        )
+        return Response(text, mimetype="text/plain")
+    
     @app.get("/api/health")
     def health():
         return jsonify(status="ok")
