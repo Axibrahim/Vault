@@ -78,6 +78,7 @@ export class TransferSession {
   // The devices this one may talk to: [{ id, name }]. It can change while the page is open.
   setPeers(list) {
     this.peers = new Map(list.map((p) => [p.id, p.name]));
+    this.peerTypes = new Map(list.map((p) => [p.id, p.type]));
   }
 
   start() {
@@ -698,8 +699,15 @@ export class TransferSession {
     if (this.clip && (!peerId || this.clip.peerId !== peerId)) {
       this._fail(this.clip, new Error("Another device was chosen"));
     }
-    if (!this.dialsText || !peerId || !online || this.clip || this.textRetry || !this.peers.has(peerId)) return;
+    if (!peerId || !online || this.clip || this.textRetry || !this.peers.has(peerId) || !this._dialsTextTo(peerId)) return;
     this._openClip(peerId);
+  }
+
+  // Who opens the text link: a computer always dials a phone. Between two phones, the one with the lower id dials,
+  // so they never dial each other at the same moment.
+  _dialsTextTo(peerId) {
+    if (this.dialsText) return true;
+    return this.peerTypes.get(peerId) === "phone" && this.identity.deviceId < peerId;
   }
 
   // The person typed.
@@ -734,7 +742,7 @@ export class TransferSession {
   _textEnded(link) {
     this.text.detach();
     this.text.setStatus("offline");
-    if (!this.dialsText || !this.wantText || !this.wantText.online || this.textRetry) return;
+    if (!this.wantText || !this._dialsTextTo(this.wantText.peerId) || !this.wantText.online || this.textRetry) return;
     const wait = TEXT_RETRY_MS[Math.min(this.textTries, TEXT_RETRY_MS.length - 1)];
     this.textTries += 1;
     this.textRetry = setTimeout(() => {

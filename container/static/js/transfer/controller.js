@@ -309,8 +309,11 @@ export function activateTransfers({ role, uid, identity, devices }) {
   const active = devices.filter((d) => d.status === "active");
   knownIds = new Set(active.map((d) => d.id));
 
-  const peerType = role === "desktop" ? "phone" : "desktop";
-  peers = active.filter((d) => d.type === peerType && d.id !== identity.deviceId);
+  // A computer sends to phones. A phone can send to the computer and to the account's other phones.
+  const peerTypes = role === "desktop" ? ["phone"] : ["desktop", "phone"];
+  peers = active
+    .filter((d) => peerTypes.includes(d.type) && d.id !== identity.deviceId)
+    .sort((a, b) => peerTypes.indexOf(a.type) - peerTypes.indexOf(b.type));   // computers first, so they stay the default
   if (!peers.some((p) => p.id === selectedId)) selectedId = peers.length ? peers[0].id : null;
 
   // same screen again (for example after a pairing): keep the running transfer, just update the list
