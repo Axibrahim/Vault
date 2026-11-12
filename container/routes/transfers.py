@@ -102,6 +102,31 @@ def _cloudflare_servers(cfg):
     ]
 
 
+def _metered_servers(cfg):
+    """Relay credentials from Metered's free Open Relay. Returns [] on any failure."""
+    try:
+        reply = requests.get(cfg["METERED_TURN_URL"], timeout=CLOUDFLARE_TIMEOUT_SECONDS)
+        reply.raise_for_status()
+        servers = reply.json()
+        if not isinstance(servers, list):
+            raise ValueError("unexpected reply")
+        for server in servers:
+            if "urls" not in server:
+                raise ValueError("unexpected reply")
+    except (requests.RequestException, ValueError, KeyError, TypeError) as err:
+        current_app.logger.warning("Metered TURN unavailable: %s", type(err).__name__)
+        return []
+
+    # Browsers block port 53, so those addresses would only add a timeout.
+    cleaned = []
+    for server in servers:
+        urls = server["urls"] if isinstance(server["urls"], list) else [server["urls"]]
+        urls = [url for url in urls if not re.search(r":53(\?|$)", url)]
+        if urls:
+            cleaned.append({**server, "urls": urls})
+    return cleaned
+
+
 @bp.get("/ice-servers")
 @limiter.limit("30 per minute")
 @login_required
@@ -126,9 +151,11 @@ def ice_servers():
             "username": username,
             "credential": base64.b64encode(digest).decode(),
         })
-
     if cfg["CLOUDFLARE_TURN_KEY_ID"]:
         servers.extend(_cloudflare_servers(cfg))
+
+    if cfg["METERED_TURN_URL"]:
+        servers.extend(_metered_servers(cfg))
 
     return jsonify(iceServers=servers)
 

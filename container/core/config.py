@@ -43,6 +43,9 @@ class BaseConfig:
     CLOUDFLARE_TURN_KEY_ID = os.environ.get("CLOUDFLARE_TURN_KEY_ID", "")
     CLOUDFLARE_TURN_API_TOKEN = os.environ.get("CLOUDFLARE_TURN_API_TOKEN", "")
 
+    # Metered Open Relay (free relay, no card). Paste the full credentials URL from the Metered dashboard.
+    METERED_TURN_URL = os.environ.get("METERED_TURN_URL", "")
+
     # -- Firebase --
     FIREBASE_CREDENTIALS_FILE = os.environ.get("FIREBASE_CREDENTIALS_FILE", "serviceAccountKey.json")
     # On a hosting platform there is no key file: put the key (base64-encoded) in this variable instead
