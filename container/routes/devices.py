@@ -171,7 +171,7 @@ def challenge():
 
 
 @bp.post("/presence")
-@limiter.limit("120 per minute")
+@limiter.limit("300 per minute")
 @login_required
 def presence():
     """A device says "I am open, and I am ready / busy / blocked" and gets everyone's status back.

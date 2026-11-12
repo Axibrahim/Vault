@@ -12,7 +12,7 @@ import { formatBytes } from "./safety.js";
 import { TransferSession } from "./session.js";
 import { FolderSink, PhoneSink } from "./sinks.js";
 
-const BEAT_EVERY_MS = 10_000;
+const BEAT_EVERY_MS = 1_000;
 
 let session = null;
 let running = null;        // { role, uid, deviceId }
@@ -178,7 +178,7 @@ function paint() {
   setStatus(summary.state === "ready" ? `Connected to ${peer.name}` : summary.text);
 }
 
-async function beat() {
+async function beatOnce() {
   if (!running) return;
   const deviceId = running.deviceId;
   try {
@@ -198,6 +198,18 @@ async function beat() {
     Promise.resolve(refreshApp()).finally(() => { refreshing = false; });
   }
   paint();
+}
+
+let beating = false;      // a slow answer must not pile up more beats behind it
+
+async function beat() {
+  if (beating) return;
+  beating = true;
+  try {
+    await beatOnce();
+  } finally {
+    beating = false;
+  }
 }
 
 function startPresence() {

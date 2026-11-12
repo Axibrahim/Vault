@@ -216,7 +216,7 @@ def end_device_transfers(uid, device_id):
 class PresenceBoard:
     """Which devices have Vault open right now. In memory only, like the mailboxes above."""
 
-    def __init__(self, fresh=35, keep=600):
+    def __init__(self, fresh=5, keep=600):
         self._fresh = fresh      # seconds a heartbeat counts as "online"
         self._keep = keep        # seconds before a silent device is forgotten completely
         self._lock = threading.Lock()
