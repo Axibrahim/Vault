@@ -102,10 +102,19 @@ def _cloudflare_servers(cfg):
     ]
 
 
+def _metered_url(cfg):
+    """The credentials address: either a full URL, or the app name plus API key."""
+    if cfg["METERED_TURN_URL"]:
+        return cfg["METERED_TURN_URL"]
+    app = cfg["METERED_APP"].strip()
+    host = app if "." in app else f"{app}.metered.live"
+    return f"https://{host}/api/v1/turn/credentials?apiKey={cfg['METERED_API_KEY']}"
+
+
 def _metered_servers(cfg):
     """Relay credentials from Metered's free Open Relay. Returns [] on any failure."""
     try:
-        reply = requests.get(cfg["METERED_TURN_URL"], timeout=CLOUDFLARE_TIMEOUT_SECONDS)
+        reply = requests.get(_metered_url(cfg), timeout=CLOUDFLARE_TIMEOUT_SECONDS)
         reply.raise_for_status()
         servers = reply.json()
         if not isinstance(servers, list):
@@ -154,7 +163,7 @@ def ice_servers():
     if cfg["CLOUDFLARE_TURN_KEY_ID"]:
         servers.extend(_cloudflare_servers(cfg))
 
-    if cfg["METERED_TURN_URL"]:
+    if cfg["METERED_TURN_URL"] or (cfg["METERED_APP"] and cfg["METERED_API_KEY"]):
         servers.extend(_metered_servers(cfg))
 
     return jsonify(iceServers=servers)

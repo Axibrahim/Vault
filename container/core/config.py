@@ -45,7 +45,9 @@ class BaseConfig:
 
     # Metered Open Relay (free relay, no card). Paste the full credentials URL from the Metered dashboard.
     METERED_TURN_URL = os.environ.get("METERED_TURN_URL", "")
-
+    METERED_APP = os.environ.get("METERED_APP", "")
+    METERED_API_KEY = os.environ.get("METERED_API_KEY", "")
+    
     # -- Firebase --
     FIREBASE_CREDENTIALS_FILE = os.environ.get("FIREBASE_CREDENTIALS_FILE", "serviceAccountKey.json")
     # On a hosting platform there is no key file: put the key (base64-encoded) in this variable instead

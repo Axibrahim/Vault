@@ -188,6 +188,64 @@ def test_ice_servers_still_work_when_cloudflare_fails(api, login, cloudflare, re
     assert response.get_json() == {"iceServers": [{"urls": ["stun:stun.example.com:3478"]}]}
 
 
+@pytest.fixture
+def metered(flask_app, monkeypatch):
+    """Turns the Metered relay on and records what the server asked it."""
+    monkeypatch.setitem(flask_app.config, "METERED_TURN_URL", "https://relay.example.com/credentials?key=abc")
+    calls = []
+    answer = {"reply": FakeReply([])}
+
+    def fake_get(url, **kwargs):
+        calls.append((url, kwargs))
+        if isinstance(answer["reply"], Exception):
+            raise answer["reply"]
+        return answer["reply"]
+
+    monkeypatch.setattr(requests, "get", fake_get)
+    return calls, answer
+
+
+METERED_ANSWER = [
+    {"urls": "stun:stun.relay.example.com:80"},
+    {
+        "urls": ["turn:relay.example.com:80", "turn:relay.example.com:53?transport=udp"],
+        "username": "u", "credential": "c",
+    },
+    {"urls": "turn:relay.example.com:53", "username": "u", "credential": "c"},
+]
+
+
+def test_ice_servers_adds_metered_relay_and_drops_port_53(api, login, metered):
+    calls, answer = metered
+    answer["reply"] = FakeReply(METERED_ANSWER)
+    login()
+
+    servers = api.get("/api/transfers/ice-servers").get_json()["iceServers"]
+    assert servers[0] == {"urls": ["stun:stun.example.com:3478"]}                    # our own STUN stays first
+    assert servers[1] == {"urls": ["stun:stun.relay.example.com:80"]}                # a single address becomes a list
+    assert servers[2] == {"urls": ["turn:relay.example.com:80"], "username": "u", "credential": "c"}
+    assert len(servers) == 3, "a server that only had a port-53 address is dropped"
+    assert calls[0][0] == "https://relay.example.com/credentials?key=abc"
+    assert calls[0][1]["timeout"] == 4
+
+
+@pytest.mark.parametrize("reply", [
+    requests.ConnectionError("down"),
+    FakeReply(status=503),
+    FakeReply(bad_json=True),
+    FakeReply({"not": "a list"}),
+    FakeReply([{"nothing": 1}]),
+    FakeReply([5]),
+])
+def test_ice_servers_still_work_when_metered_fails(api, login, metered, reply):
+    _, answer = metered
+    answer["reply"] = reply
+    login()
+    response = api.get("/api/transfers/ice-servers")
+    assert response.status_code == 200
+    assert response.get_json() == {"iceServers": [{"urls": ["stun:stun.example.com:3478"]}]}
+
+
 # ---------- POST /api/transfers/offer ----------
 
 def test_offer_requires_login(api):
