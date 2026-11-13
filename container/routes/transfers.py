@@ -163,6 +163,14 @@ def ice_servers():
     if cfg["CLOUDFLARE_TURN_KEY_ID"]:
         servers.extend(_cloudflare_servers(cfg))
 
+    static_urls = _urls(cfg["STATIC_TURN_URLS"])
+    if static_urls:
+        servers.append({
+            "urls": static_urls,
+            "username": cfg["STATIC_TURN_USERNAME"],
+            "credential": cfg["STATIC_TURN_CREDENTIAL"],
+        })
+
     if cfg["METERED_TURN_URL"] or (cfg["METERED_APP"] and cfg["METERED_API_KEY"]):
         servers.extend(_metered_servers(cfg))
 

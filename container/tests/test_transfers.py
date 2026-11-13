@@ -95,6 +95,20 @@ def test_ice_servers_adds_short_lived_turn_credentials(api, login, flask_app, mo
     assert turn["credential"] == expected
 
 
+def test_ice_servers_adds_a_static_relay_without_any_outgoing_call(api, login, flask_app, monkeypatch):
+    monkeypatch.setitem(flask_app.config, "STATIC_TURN_URLS", "turn:relay.example.com:80, turns:relay.example.com:443?transport=tcp")
+    monkeypatch.setitem(flask_app.config, "STATIC_TURN_USERNAME", "relay-user")
+    monkeypatch.setitem(flask_app.config, "STATIC_TURN_CREDENTIAL", "relay-pass")
+    login("user-7")
+
+    servers = api.get("/api/transfers/ice-servers").get_json()["iceServers"]
+    assert servers[1] == {
+        "urls": ["turn:relay.example.com:80", "turns:relay.example.com:443?transport=tcp"],
+        "username": "relay-user",
+        "credential": "relay-pass",
+    }
+
+
 def test_ice_servers_can_be_empty(api, login, flask_app, monkeypatch):
     monkeypatch.setitem(flask_app.config, "STUN_URLS", "")
     login()

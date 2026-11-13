@@ -21,6 +21,8 @@ const WATCH_EVERY_MS = 5_000;
 const SEEN_OFFERS = 50;           // transfer ids remembered, so a replayed offer is ignored
 const TEXT_LINK_MAX_MS = 6 * 60 * 60 * 1000;   // the text link is replaced by a freshly authenticated one this often
 const TEXT_RETRY_MS = [2_000, 5_000, 15_000, 30_000];
+const RESUME_RETRY_MS = [3_000, 8_000, 20_000, 45_000, 90_000];   // pause before each automatic resume attempt
+const MAX_AUTO_RESUMES = 8;                                        // after this many, the person taps Resume themselves
 
 const closeSafe = (thing) => { try { thing.close(); } catch (err) { /* already closed */ } };
 
@@ -98,6 +100,7 @@ export class TransferSession {
   _dropOutgoing() {
     if (this.outgoing) {
       clearTimeout(this.outgoing.expiry);
+      clearTimeout(this.outgoing.retry);
       this.outgoing.abort.abort();
     }
     this.outgoing = null;
@@ -122,15 +125,16 @@ export class TransferSession {
     });
     this.outgoing = {
       batch: crypto.randomUUID(), files, total: files.reduce((n, f) => n + f.size, 0), peerId,
-      abort: new AbortController(), expiry: null,
+      abort: new AbortController(), expiry: null, retry: null, tries: 0, running: false,
     };
     await this._run();
   }
 
   async resume() {
-    if (!this.outgoing || this.link) return;
+    if (!this.outgoing || this.link || this.outgoing.running) return;
     clearTimeout(this.outgoing.expiry);
-    await this._run();               // a resume is a brand new connection: new offer, new signature, new transfer id
+    clearTimeout(this.outgoing.retry);
+    await this._run();           // a resume is a brand new connection: new offer, new signature, new transfer id
   }
 
   async cancel() {
@@ -144,6 +148,7 @@ export class TransferSession {
 
   async _run() {
     const out = this.outgoing;
+    out.running = true;
     this.peerId = out.peerId;
     this.peerName = this.peers.get(out.peerId) || this.peerName;
     let link = null;
@@ -181,7 +186,8 @@ export class TransferSession {
           : err.declined === "busy" ? "The other device is busy with another transfer." : "The other device declined the files.";
         this.ui.show("interrupted", "Not sent", why, null, false);
       } else {
-        this.ui.show("interrupted", "Transfer interrupted", err.message || "The connection was lost", null, true);
+        const again = out.tries < MAX_AUTO_RESUMES ? " Trying again automatically..." : "";
+        this.ui.show("interrupted", "Transfer interrupted", `${err.message || "The connection was lost"}${again}`, null, true);
         // an interrupted transfer cannot wait for ever: after a while it is forgotten
         clearTimeout(out.expiry);
         out.expiry = setTimeout(() => {
@@ -191,8 +197,27 @@ export class TransferSession {
           }
         }, PARTIAL_TTL_MS);
         if (out.expiry.unref) out.expiry.unref();
+        this._scheduleResume(out);        // try again by itself; the Resume button stays for the person to use
       }
+    } finally {
+      out.running = false;
     }
+  }
+
+  // After an interruption the sender reconnects by itself, a few times, with growing pauses.
+  // It waits while the device is offline. The receiver keeps what it already has, so a resume carries on from there.
+  _scheduleResume(out) {
+    clearTimeout(out.retry);
+    if (this.outgoing !== out || out.tries >= MAX_AUTO_RESUMES) return;
+    const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+    const wait = offline ? 3_000 : RESUME_RETRY_MS[Math.min(out.tries, RESUME_RETRY_MS.length - 1)];
+    out.retry = setTimeout(() => {
+      if (this.outgoing !== out || this.link || out.running) return;
+      if (typeof navigator !== "undefined" && navigator.onLine === false) return this._scheduleResume(out);
+      out.tries += 1;
+      this.resume().catch(() => {});
+    }, wait);
+    if (out.retry.unref) out.retry.unref();
   }
 
   // Reads every file once and works out its SHA-256 (the digest the other device must match).
@@ -264,6 +289,7 @@ export class TransferSession {
       link.life.require(S.WAITING);
       link.life.move(S.TRANSFERRING);
       this._watch(link);
+      out.tries = 0;                     // connected again: a later drop gets a fresh set of automatic attempts
       for (const f of out.files) {
         const entry = accept.files.find((x) => x.id === f.id);
         if (!entry || entry.have > f.size) { f.startBlock = 0; continue; }

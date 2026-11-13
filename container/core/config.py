@@ -48,6 +48,11 @@ class BaseConfig:
     METERED_APP = os.environ.get("METERED_APP", "")
     METERED_API_KEY = os.environ.get("METERED_API_KEY", "")
     
+    # Fixed relay (no outgoing call): the addresses plus the username/password of one TURN credential.
+    STATIC_TURN_URLS = os.environ.get("STATIC_TURN_URLS", "")
+    STATIC_TURN_USERNAME = os.environ.get("STATIC_TURN_USERNAME", "")
+    STATIC_TURN_CREDENTIAL = os.environ.get("STATIC_TURN_CREDENTIAL", "")
+
     # -- Firebase --
     FIREBASE_CREDENTIALS_FILE = os.environ.get("FIREBASE_CREDENTIALS_FILE", "serviceAccountKey.json")
     # On a hosting platform there is no key file: put the key (base64-encoded) in this variable instead
@@ -98,6 +103,9 @@ def get_config():
 
     if bool(cfg.CLOUDFLARE_TURN_KEY_ID) != bool(cfg.CLOUDFLARE_TURN_API_TOKEN):
         raise RuntimeError("CLOUDFLARE_TURN_KEY_ID and CLOUDFLARE_TURN_API_TOKEN must be set together (or both left empty).")
+
+    if len({bool(cfg.STATIC_TURN_URLS), bool(cfg.STATIC_TURN_USERNAME), bool(cfg.STATIC_TURN_CREDENTIAL)}) != 1:
+        raise RuntimeError("STATIC_TURN_URLS, STATIC_TURN_USERNAME and STATIC_TURN_CREDENTIAL must be set together (or all left empty).")
 
     if bool(cfg.TURN_URLS) != bool(cfg.TURN_SECRET):
         raise RuntimeError("TURN_URLS and TURN_SECRET must be set together (or both left empty).")

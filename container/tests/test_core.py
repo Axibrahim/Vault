@@ -421,6 +421,15 @@ def test_turn_settings_must_come_together(fresh_config):
     assert fresh_config(TURN_URLS="turn:x", TURN_SECRET="s").TURN_URLS == "turn:x"
 
 
+def test_static_turn_settings_must_come_together(fresh_config):
+    with pytest.raises(RuntimeError, match="STATIC_TURN_URLS"):
+        fresh_config(STATIC_TURN_URLS="turn:x", STATIC_TURN_USERNAME="u", STATIC_TURN_CREDENTIAL="")
+    with pytest.raises(RuntimeError, match="STATIC_TURN_URLS"):
+        fresh_config(STATIC_TURN_URLS="", STATIC_TURN_USERNAME="u", STATIC_TURN_CREDENTIAL="c")
+    cfg = fresh_config(STATIC_TURN_URLS="turn:x", STATIC_TURN_USERNAME="u", STATIC_TURN_CREDENTIAL="c")
+    assert cfg.STATIC_TURN_URLS == "turn:x"
+
+
 def test_cloudflare_turn_settings_must_come_together(fresh_config):
     with pytest.raises(RuntimeError, match="CLOUDFLARE_TURN_KEY_ID"):
         fresh_config(CLOUDFLARE_TURN_KEY_ID="key", CLOUDFLARE_TURN_API_TOKEN="")
