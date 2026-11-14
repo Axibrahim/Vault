@@ -10,7 +10,7 @@ import { hideTransfer, onTransferCancel, onTransferResume, showTransfer } from "
 import { saveToFiles, saveToGallery, isIos } from "./save.js";
 import { formatBytes } from "./safety.js";
 import { TransferSession } from "./session.js";
-import { FolderSink, PhoneSink } from "./sinks.js";
+import { FolderSink, PhoneSink, heldMap } from "./sinks.js";
 
 const BEAT_EVERY_MS = 1_000;
 
@@ -42,6 +42,7 @@ function lazyFolderSink(uid) {
       return inner.ready();
     },
     open: (meta) => inner.open(meta),
+    held: (peerId, files) => heldMap(peerId, files),
   };
 }
 

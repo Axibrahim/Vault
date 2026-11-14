@@ -6,6 +6,7 @@ import {
   setRememberPreference,
 } from "../core/auth.js";
 import { $, setStatus } from "../ui/dom.js";
+import { clearAll } from "../transfer/partials.js";
 
 export function showLoginOptions() {
   $("remember").checked = getRememberPreference();
@@ -30,6 +31,7 @@ export function initLogin(refresh) {
     try {
       await logout();
     } finally {
+      await clearAll().catch(() => {});       // nothing of this account stays in the browser
       await refresh();
     }
   });
@@ -43,6 +45,8 @@ export function initLogin(refresh) {
       setStatus("Could not sign out everywhere");
       return;
     }
+    
+    await clearAll().catch(() => {});
     await refresh();
   });
 }

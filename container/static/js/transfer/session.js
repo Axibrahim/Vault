@@ -421,21 +421,29 @@ export class TransferSession {
       this._fail(link, Object.assign(new Error("declined"), { declined: reason, remoteClosed: true }));
     };
 
+    // Blocks of these very files from this very device may already be saved: after a dropped connection, a closed
+    // tab or a crashed browser, on either side. They are found by what the files ARE (their digest), not by batch.
+    const held = this.sink.held ? await this.sink.held(link.peerId, manifest.files).catch(() => new Map()) : new Map();
+
     if (!(await this.sink.ready())) {
       this.ui.show("interrupted", "Could not receive", "Allow access to the receiving folder first.", null, false);
       return decline("folder");
     }
 
     if (!resuming) {
-      this.ui.show("loading", `${this.peerName} wants to send`, `${manifest.files.length} file(s), ${formatBytes(manifest.total)}`, null, false);
-      if (!(await this.ui.askAccept(manifest))) return decline("user");
+      // Carrying on with files the person already accepted does not need another question.
+      const continuing = manifest.files.length > 0 && manifest.files.every((meta) => held.has(meta.id));
+      if (!continuing) {
+        this.ui.show("loading", `${this.peerName} wants to send`, `${manifest.files.length} file(s), ${formatBytes(manifest.total)}`, null, false);
+        if (!(await this.ui.askAccept(manifest))) return decline("user");
+      }
       if (link.ended) return;
-      this._discardPartial();
+    this._discardPartial({ keep: true });
       this.partial = {
         batch: manifest.batch,
         peerId: link.peerId,
         manifest,
-        files: new Map(manifest.files.map((meta) => [meta.id, { meta, writer: null, hashes: [], result: null, run: null }])),
+        files: new Map(manifest.files.map((meta) => [meta.id, { meta, writer: null, hashes: held.get(meta.id) || [], result: null, run: null }])),
       };
     }
 
@@ -461,7 +469,7 @@ export class TransferSession {
     if (!entry || entry.result) return closeSafe(channel);
 
     if (!entry.writer) {
-      entry.writer = this.sink.open(entry.meta);
+      entry.writer = this.sink.open({ ...entry.meta, peerId: link.peerId });
       entry.writer.catch(() => {});
     }
     const run = {};
@@ -493,11 +501,14 @@ export class TransferSession {
     this.ui.received(results, partial.manifest);
   }
 
-  async _discardPartial() {
+  // `keep`: only let go of it in memory. The blocks saved on disk stay, so a later attempt can carry on
+  // (they are deleted after a day, or when the person signs out). Without `keep`, everything is deleted.
+  async _discardPartial({ keep = false } = {}) {
     const partial = this.partial;
     this.partial = null;
     if (!partial) return;
     clearTimeout(partial.expiry);
+    if (keep) return;
     for (const entry of partial.files.values()) {
       if (entry.writer && !entry.result) {
         try { (await entry.writer).abort(); } catch (err) { /* nothing was opened */ }
@@ -576,7 +587,7 @@ export class TransferSession {
     } else if (msg.t === "manifest") {
       this._onManifest(link, msg).catch((err) => this._fail(link, err));
     } else if (msg.t === "cancel") {
-      this._discardPartial();
+      this._discardPartial({ keep: true });          // frees memory only: what is saved on disk can still be matched
       this._fail(link, Object.assign(new Error("The other device cancelled"), { cancelled: true, quiet: true }));
     }
   }
@@ -708,7 +719,7 @@ export class TransferSession {
       clearTimeout(kept.expiry);
       kept.expiry = setTimeout(() => {
         if (this.partial === kept) {
-          this._discardPartial();
+          this._discardPartial({ keep: true });
           this.ui.hide();
         }
       }, PARTIAL_TTL_MS);

@@ -45,7 +45,7 @@ export function receiveFile(channel, {
       if (!active()) throw new Error("The transfer is over");
       if ((await sha256Hex(job.bytes)) !== job.hash) throw integrityError("A block failed its integrity check");
       if (!active()) throw new Error("The transfer is over");
-      await (await writer).writeBlock(job.index, job.bytes);
+      await (await writer).writeBlock(job.index, job.bytes, job.hash);
       hashes[job.index] = job.hash;
       onBlock(job.index);
       send({ t: "ack", i: job.index });
