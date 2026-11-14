@@ -108,7 +108,9 @@
 /* ---------- Settings: takes the place of the main panel ---------- */
 
 body[data-panel="settings"] #app-view > :not(#settings-view),
-body[data-panel="settings"] #peers-box { display: none; }
+body[data-panel="about"] #app-view > :not(#about-view),
+body[data-panel="settings"] #peers-box,
+body[data-panel="about"] #peers-box { display: none; }
 .history small { opacity: 0.7; text-align: right; }
 
 /* shared text box */
@@ -202,3 +204,61 @@ body[data-panel="settings"] #peers-box { display: none; }
   from { opacity: 0; transform: translateX(-8px); }
   to { opacity: 1; transform: none; }
 }
+
+
+/* ---------- About: fixed text in the same shell as Settings ---------- */
+
+.avatar .ico { stroke: #1a1205; }
+
+.about-gap { margin-top: 22px; }
+
+.about-flow { display: grid; gap: 14px; padding: 18px 16px; border: 1px solid var(--line); border-radius: 14px; background: rgba(0, 0, 0, 0.22); }
+
+.about-flow p { margin: 0; text-align: center; font-size: 0.8rem; line-height: 1.4; color: var(--muted); }
+
+.about-nodes { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+
+.about-node { display: grid; justify-items: center; gap: 8px; font: 500 0.66rem var(--mono); letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); text-align: center; }
+
+.about-disc { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.12); background: rgba(255, 255, 255, 0.05); }
+
+.about-disc .ico { stroke: var(--text); }
+
+.about-node[data-key="true"] { color: var(--brass); }
+
+.about-node[data-key="true"] .about-disc { background: var(--brass); border-color: var(--brass); }
+
+.about-node[data-key="true"] .ico { stroke: #1a1205; }
+
+.about-wire { position: relative; flex: 1; min-width: 12px; height: 2px; border-radius: 1px; background: var(--brass-d); overflow: hidden; }
+
+/* a bead of light runs along the wire, so the route reads as moving */
+@media (prefers-reduced-motion: no-preference) {
+  .about-wire::after { content: ""; position: absolute; inset: 0 auto 0 0; width: 40%; background: linear-gradient(90deg, transparent, var(--brass), transparent); animation: wire-run 1.8s linear infinite; }
+}
+
+@keyframes wire-run { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+
+.about-steps { list-style: none; margin: 0; padding: 0; counter-reset: about-step; }
+
+.about-steps li { display: grid; grid-template-columns: 24px 1fr; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); counter-increment: about-step; }
+
+.about-steps li:last-child { border-bottom: 0; }
+
+.about-steps li::before { content: counter(about-step); display: grid; place-items: center; width: 24px; height: 24px; border: 1px solid var(--brass-d); border-radius: 50%; color: var(--brass); font: 500 0.68rem var(--mono); }
+
+.about-steps strong, .about-item strong, .about-note strong { display: block; font-weight: 600; }
+
+.about-steps span, .about-item p, .about-note p { display: block; margin: 3px 0 0; color: var(--muted); font-size: 0.8rem; line-height: 1.4; }
+
+.about-note { display: grid; grid-template-columns: 18px 1fr; gap: 12px; margin-top: 16px; padding: 14px; border: 1px solid rgba(185, 134, 58, 0.5); border-radius: 12px; background: rgba(240, 180, 91, 0.07); }
+
+.about-note .ico { margin-top: 2px; }
+
+.about-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+
+.about-item { display: grid; grid-template-columns: 32px 1fr; gap: 12px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: rgba(0, 0, 0, 0.22); animation: row-in 0.3s both; }
+
+.about-item strong { font-size: 0.9rem; }
+
+.about-bubble { display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid rgba(185, 134, 58, 0.5); border-radius: 10px; background: rgba(240, 180, 91, 0.1); }

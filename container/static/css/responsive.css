@@ -56,7 +56,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
-  .settings-btn::after, #app-view > *, .sdevice, .history li, .btn.danger[data-armed="true"] { animation: none !important; }
+  .settings-btn::after, #app-view > *, .sdevice, .history li, .about-item, .btn.danger[data-armed="true"] { animation: none !important; }
 }
 
 /* ---------- phones: the shared text box opens from a floating "Text" button ---------- */

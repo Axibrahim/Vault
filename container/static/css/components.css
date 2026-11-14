@@ -107,10 +107,16 @@ input:focus { border-color: var(--brass-d); }
 /* the Settings button sits in the top-right corner of the main card */
 .panel { position: relative; }
 
-.panel > .settings-btn {
+/* Settings and About sit together in that corner */
+.panel > .panel-actions {
   position: absolute; top: 14px; right: 14px; z-index: 3;
+  display: flex; align-items: center; gap: 8px;
   animation: settings-in 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
 }
+
+.about-btn { width: 44px; padding: 0; justify-content: center; }
+
+.about-btn .ico { width: 22px; height: 22px; stroke: currentColor; }
 
 @keyframes settings-in {
   from { opacity: 0; transform: translateY(-6px) scale(0.92); }
@@ -118,8 +124,8 @@ input:focus { border-color: var(--brass-d); }
 }
 
 /* while Settings is open, leave room so the button does not cover the "Done" button */
-body[data-panel="settings"] #settings-view { padding-top: 28px; }
+body[data-panel="settings"] #settings-view, body[data-panel="about"] #about-view { padding-top: 28px; }
 
 @media (prefers-reduced-motion: reduce) {
-  .panel > .settings-btn { animation: none; }
+  .panel > .panel-actions { animation: none; }
 }

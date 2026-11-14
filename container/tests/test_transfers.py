@@ -627,3 +627,13 @@ def test_events_are_private_to_the_account(api, pair, login, seed):
     login("user-2")
     assert poll(api, other)["events"] == []
     assert hub._boxes.get(("user-2", desktop.device_id)) is None
+
+
+def test_metered_url_is_built_from_app_name_and_key():
+    from routes.transfers import _metered_url
+
+    cfg = {"METERED_TURN_URL": "", "METERED_APP": "vault_io", "METERED_API_KEY": "k123"}
+    assert _metered_url(cfg) == "https://vault_io.metered.live/api/v1/turn/credentials?apiKey=k123"
+
+    cfg["METERED_APP"] = "custom.example.com"
+    assert _metered_url(cfg) == "https://custom.example.com/api/v1/turn/credentials?apiKey=k123"
