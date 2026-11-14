@@ -19,12 +19,21 @@ export function setSceneState(name) {
 
 const canvas = document.getElementById("scene");
 const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
-let renderer, scene, camera, rig, rings, bolts, core, coreMat, dust, light;
+let renderer, scene, camera, rig, rings, bolts, core, coreMat, dust, light, crates;
+let pulse = 0;   // 1 right after a transfer succeeds, eases back to 0
 const cur = { spin: 0.12, bolts: 0, open: 0, core: 0.35, zoom: 9 };
 const color = new THREE.Color(0xf0b45b);
 const mouse = { x: 0, y: 0 };
 const ease = (a, b, k) => a + (b - a) * k;
 let last = performance.now();
+
+
+// Called when a transfer completes: two brass vault boxes drop in, the core flashes, then they fade away.
+export function celebrate() {
+  if (!renderer || still || !crates) return;
+  crates.forEach((c, i) => { c.userData.t = -i * 0.2; });   // negative = staggered start delay
+  pulse = 1;
+}
 
 try {
   const phone = Math.min(innerWidth, innerHeight) < 600;
@@ -76,6 +85,24 @@ try {
   dust = new THREE.Points(g, new THREE.PointsMaterial({ size: 0.03, color: 0x8a8f98, transparent: true, opacity: 0.55 }));
   scene.add(dust);
 
+  
+  // Success crates (see celebrate()). They live in the rig, so they follow its position on every screen size.
+  const crateMat = new THREE.MeshStandardMaterial({ color: 0xf0b45b, metalness: 0.75, roughness: 0.3, emissive: 0x2a1a04 });
+  const crateEdge = new THREE.LineBasicMaterial({ color: 0x1a1205, transparent: true, opacity: 0.55 });
+  const makeCrate = (size, x, y, z) => {
+    const g = new THREE.Group();
+    g.add(new THREE.Mesh(new THREE.BoxGeometry(size, size, size), crateMat));
+    g.add(new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(size, size, size)), crateEdge));
+    const door = new THREE.Mesh(new THREE.TorusGeometry(size * 0.28, size * 0.035, 12, 48), steel);
+    door.position.z = size / 2 + 0.01;
+    g.add(door);
+    g.userData = { x, y, z, t: null };
+    g.visible = false;
+    rig.add(g);
+    return g;
+  };
+  crates = [makeCrate(1.5, -0.4, 2.1, 1.2), makeCrate(0.9, -5.2, -1.6, 1.6)];
+
   scene.add(new THREE.AmbientLight(0xffffff, 0.35));
   light = new THREE.PointLight(0xf0b45b, 90, 30);
   light.position.set(3, 3, 6);
@@ -125,15 +152,17 @@ function frame(dt) {
   color.lerp(new THREE.Color(target.color), k);
   const t = performance.now() / 1000;
 
-  rings.mid.rotation.z += dt * cur.spin;
+  rings.mid.rotation.z += dt * (cur.spin + pulse * 3);
   rings.ticks.rotation.z -= dt * cur.spin * 1.6;
   rings.outer.rotation.z = cur.open * 0.6;
   rings.dial.rotation.y = cur.open * 0.5;
   core.rotation.y += dt * (0.3 + cur.spin);
   core.rotation.x += dt * 0.2;
   coreMat.color.copy(color);
-  coreMat.opacity = 0.25 + cur.core * (0.5 + 0.2 * Math.sin(t * 2));
+  coreMat.opacity = Math.min(1, 0.25 + cur.core * (0.5 + 0.2 * Math.sin(t * 2)) + pulse * 0.5);
   light.color.copy(color);
+  light.intensity = 90 + pulse * 140;
+  pulse = Math.max(0, pulse - dt * 0.7);
   for (const b of bolts) {
     const r = 2.45 + cur.bolts * 0.55;
     b.position.set(Math.cos(b.userData.a) * r, Math.sin(b.userData.a) * r, 0);
@@ -143,6 +172,17 @@ function frame(dt) {
   rig.rotation.y = ease(rig.rotation.y, mouse.x * 0.35 + Math.sin(t * 0.5) * 0.12, 0.05);
   rig.rotation.x = ease(rig.rotation.x, mouse.y * 0.2, 0.05);
   camera.position.z = cur.zoom;
+  for (const c of crates) {
+    const u = c.userData;
+    if (u.t === null) continue;
+    u.t += dt;
+    c.visible = u.t >= 0;
+    const tt = Math.max(0, u.t), d = Math.min(1, tt / 0.9), fall = 1 - Math.pow(1 - d, 3);   // drop with ease-out
+    c.position.set(u.x, u.y + (1 - fall) * 5 + (d >= 1 ? Math.sin((tt - 0.9) * 2) * 0.06 : 0), u.z);
+    c.rotation.set(0.55 + (1 - fall) * 2.2, 0.75 + (1 - fall) * 3 + tt * 0.35, 0);
+    c.scale.setScalar(tt < 4.2 ? 1 : Math.max(0.0001, 1 - (tt - 4.2) / 0.8));                 // shrink away at the end
+    if (tt > 5) { c.visible = false; u.t = null; }
+  }
   renderer.render(scene, camera);
 }
 

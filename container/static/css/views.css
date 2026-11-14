@@ -262,3 +262,14 @@ body[data-panel="about"] #peers-box { display: none; }
 .about-item strong { font-size: 0.9rem; }
 
 .about-bubble { display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid rgba(185, 134, 58, 0.5); border-radius: 10px; background: rgba(240, 180, 91, 0.1); }
+
+
+/* ---------- Home card: stat tiles in one row, tidier dropzone and actions ---------- */
+#desktop-view .meta { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 18px 0; }
+#desktop-view .meta div { padding: 12px 14px; border-radius: 14px; background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.08); }
+#desktop-view .meta dt { font-size: 0.62rem; letter-spacing: 0.12em; }
+#desktop-view .meta dd { font-weight: 500; font-size: 0.95rem; }
+.sendbox { display: grid; justify-items: center; gap: 12px; padding: 26px 20px; text-align: center; border: 1.5px dashed rgba(240, 180, 91, 0.35); border-radius: 20px; background: rgba(255, 255, 255, 0.02); }
+.sendbox .hint { margin: 0; max-width: 34ch; }
+#desktop-view > .row:last-child { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); justify-content: space-between; }
+@media (max-width: 520px) { #desktop-view .meta { grid-template-columns: 1fr; } }

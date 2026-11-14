@@ -1,7 +1,7 @@
 // Vault service worker. Makes the app installable and keeps the page shell
 // available when the connection drops.
 // It never touches /api/ requests: sign-in, devices and transfers always go to the network.
-const CACHE = "vault-shell-v1";
+const CACHE = "vault-shell-v2";
 
 const SHELL = [
   "/",
