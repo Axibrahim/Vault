@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import ipaddress
 import re
 import secrets
 import uuid
@@ -47,6 +48,18 @@ def _hash_code(code):
     return hmac.new(key, f"pairing-code|{code}".encode(), hashlib.sha256).hexdigest()
 
 
+def _network_key():
+    """A fingerprint of the network the request comes from: the address (IPv4) or the /64 (IPv6).
+    Used only to tell whether two devices reach Vault from the same place; the address itself is never stored."""
+    try:
+        address = ipaddress.ip_address(request.remote_addr)
+    except ValueError:
+        return None
+    network = str(ipaddress.ip_network(f"{address}/64", strict=False)) if address.version == 6 else str(address)
+    key = current_app.config["SECRET_KEY"].encode()
+    return hmac.new(key, f"pairing-network|{network}".encode(), hashlib.sha256).hexdigest()
+
+
 def _user_ref():
     return get_db().collection("users").document(g.uid)
 
@@ -57,7 +70,7 @@ def _live_pairings(user_ref):
 
 
 @firestore.transactional
-def _claim_in_txn(transaction, user_ref, pairing_ref, phone):
+def _claim_in_txn(transaction, user_ref, pairing_ref, phone, nearby):
     user = user_ref.get(transaction=transaction)
     desktops, phones = counts_of(user.to_dict())
     if desktops < 1 or phones >= MAX_PER_TYPE:
@@ -71,6 +84,7 @@ def _claim_in_txn(transaction, user_ref, pairing_ref, phone):
     transaction.update(pairing_ref, {
         "status": "claimed",
         "phone": phone,
+        "nearby": nearby,
         "claimed_at": firestore.SERVER_TIMESTAMP,
     })
 
@@ -129,6 +143,7 @@ def create_pairing():
 
     user_ref.collection("pairings").document(pairing_id).set({
         "code_hash": _hash_code(code),     # the code itself is never stored
+        "network": _network_key(),         # where the computer is, so the phone can be checked against it
         "status": "open",
         "created_at": firestore.SERVER_TIMESTAMP,
         "expires_at": expires_at,
@@ -165,9 +180,14 @@ def claim_pairing():
         return jsonify(error="Invalid or expired code"), 400
 
     pairing_ref = matches[0].reference
+    network = matches[0].to_dict().get("network")
+    nearby = network is not None and hmac.compare_digest(network, _network_key() or "")
+    if current_app.config["PAIRING_REQUIRE_NEARBY"] and not nearby:
+        return jsonify(error="Your phone has to be on the same network as your computer to pair"), 403
+    
     phone = {"device_id": device_id, "name": name, "public_key": public_key}
     try:
-        _claim_in_txn(get_db().transaction(), user_ref, pairing_ref, phone)
+        _claim_in_txn(get_db().transaction(), user_ref, pairing_ref, phone, nearby)
     except PairingError:
         return jsonify(error="Invalid or expired code"), 400
 
@@ -195,6 +215,7 @@ def current_pairing():
     if pairing["status"] == "claimed":
         phone = pairing["phone"]
         result["phone"] = {"name": phone["name"], "fingerprint": fingerprint(phone["public_key"])}
+        result["nearby"] = bool(pairing.get("nearby"))
     return jsonify(pairing=result)
 
 
@@ -215,6 +236,10 @@ def approve_pairing(pairing_id):
     if not pairing or pairing.get("status") != "claimed":
         return jsonify(error="Not found"), 404
 
+    # A phone that is not on the computer's network needs a deliberate extra "yes" from the person at the computer.
+    if not pairing.get("nearby") and data.get("confirmFar") is not True:
+        return jsonify(error="This phone is on a different network. Confirm to approve it."), 409
+    
     # The desktop signs the pairing id AND the phone's fingerprint,
     # so it can only approve the exact phone that is shown on its screen.
     phone = pairing["phone"]

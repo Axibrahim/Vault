@@ -393,3 +393,80 @@ def test_approve_transaction_refuses_a_phone_with_a_different_fingerprint(db, ph
     with pytest.raises(PairingError):
         _approve_in_txn(FakeTransaction(), users.document("user-1"), pairing_ref, phone_ref, "WRONG-FING-ERPR")
     assert phone_ref.get().exists is False
+
+
+# ---------- is the phone near the computer? ----------
+
+def at(address):
+    """Make the next request look like it comes from this network address."""
+    return {"environ_overrides": {"REMOTE_ADDR": address}}
+
+
+def create_code_from(api, desktop, address):
+    response = api.post("/api/pairing/create", json=api.signed(desktop, "pairing-create"), **at(address))
+    assert response.status_code == 201
+    return response.get_json()
+
+
+def test_a_code_lives_for_two_minutes(api, desktop, db):
+    created = create_code(api, desktop)
+    expires = datetime.fromisoformat(created["expiresAt"])
+    assert 110 <= (expires - datetime.now(timezone.utc)).total_seconds() <= 120
+
+
+def test_create_keeps_a_fingerprint_of_the_network_never_the_address(api, desktop, db):
+    created = create_code(api, desktop)
+    stored = pairing_docs(db)[created["pairingId"]]
+    assert len(stored["network"]) == 64 and "127.0.0.1" not in str(stored)
+
+
+def test_a_phone_on_the_same_network_is_nearby_and_needs_no_extra_yes(api, desktop, phone):
+    pairing_id = claimed(api, desktop, phone)
+    assert api.get("/api/pairing/current").get_json()["pairing"]["nearby"] is True
+    assert approve(api, desktop, pairing_id, fingerprint(phone.jwk)).status_code == 200
+
+
+def test_a_phone_on_another_network_is_flagged_and_needs_an_extra_yes(api, desktop, phone, db):
+    created = create_code_from(api, desktop, "203.0.113.5")
+    assert api.post("/api/pairing/claim", json=claim_body(phone, created["code"]), **at("198.51.100.7")).status_code == 200
+
+    assert api.get("/api/pairing/current").get_json()["pairing"]["nearby"] is False
+    assert approve(api, desktop, created["pairingId"], fingerprint(phone.jwk)).status_code == 409
+    assert pairing_docs(db)[created["pairingId"]]["status"] == "claimed"       # still waiting, nothing was approved
+    assert approve(api, desktop, created["pairingId"], fingerprint(phone.jwk), confirmFar=True).status_code == 200
+
+
+def test_the_extra_yes_must_be_exactly_true(api, desktop, phone):
+    created = create_code_from(api, desktop, "203.0.113.5")
+    api.post("/api/pairing/claim", json=claim_body(phone, created["code"]), **at("198.51.100.7"))
+    assert approve(api, desktop, created["pairingId"], fingerprint(phone.jwk), confirmFar="yes").status_code == 409
+
+
+def test_strict_mode_refuses_a_phone_on_another_network_and_keeps_the_code_usable(api, desktop, phone, flask_app, monkeypatch, db):
+    monkeypatch.setitem(flask_app.config, "PAIRING_REQUIRE_NEARBY", True)
+    created = create_code_from(api, desktop, "203.0.113.5")
+
+    far = api.post("/api/pairing/claim", json=claim_body(phone, created["code"]), **at("198.51.100.7"))
+    assert far.status_code == 403
+    assert pairing_docs(db)[created["pairingId"]]["status"] == "open"          # a refused phone does not burn the code
+
+    near = api.post("/api/pairing/claim", json=claim_body(phone, created["code"]), **at("203.0.113.5"))
+    assert near.status_code == 200
+
+
+def test_ipv6_devices_count_as_near_when_they_share_the_same_prefix(api, desktop, phone):
+    created = create_code_from(api, desktop, "2001:db8:aaaa:1::10")
+    api.post("/api/pairing/claim", json=claim_body(phone, created["code"]), **at("2001:db8:aaaa:1::99"))
+    assert api.get("/api/pairing/current").get_json()["pairing"]["nearby"] is True
+
+
+def test_ipv6_devices_on_different_prefixes_are_not_near(api, desktop, phone):
+    created = create_code_from(api, desktop, "2001:db8:aaaa:1::10")
+    api.post("/api/pairing/claim", json=claim_body(phone, created["code"]), **at("2001:db8:aaaa:2::10"))
+    assert api.get("/api/pairing/current").get_json()["pairing"]["nearby"] is False
+
+
+def test_an_unreadable_address_is_never_treated_as_near(api, desktop, phone):
+    created = create_code_from(api, desktop, "not-an-address")
+    api.post("/api/pairing/claim", json=claim_body(phone, created["code"]), **at("not-an-address"))
+    assert api.get("/api/pairing/current").get_json()["pairing"]["nearby"] is False

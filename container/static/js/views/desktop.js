@@ -17,8 +17,11 @@ import {
 import { MAX_PER_TYPE } from "../routing.js";
 import { state } from "../state.js";
 import { $, setStatus, show, every, stopTimer } from "../ui/dom.js";
+import { clearQr, drawQr } from "../ui/qr.js";
 
 let pairTimer = null;
+let clockTimer = null;
+let pairExpiresAt = 0;
 
 // The enrolled computer: its name, receiving folder, folder access and phone.
 export async function showDesktop(identity, devices) {
@@ -53,8 +56,22 @@ export async function showDesktop(identity, devices) {
 
 // ---------- pairing a phone ----------
 
+// The code, its QR code and its link are shown only while they work, and are wiped from the page afterwards.
+function clearPairingSecrets() {
+  if (clockTimer) stopTimer(clockTimer);
+  clearQr($("pair-qr"));
+  $("pair-code").textContent = "";
+  $("pair-link").value = "";
+}
+
+function tickClock() {
+  const left = Math.max(0, Math.ceil((pairExpiresAt - Date.now()) / 1000));
+  $("pair-timer").textContent = `Works once. Expires in ${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}.`;
+}
+
 function endPairing(message) {
   if (pairTimer) stopTimer(pairTimer);
+  clearPairingSecrets();
   $("pair-box").hidden = true;
   $("pair-btn").hidden = false;
   setStatus(message);
@@ -73,13 +90,19 @@ async function refreshPairing() {
     return;
   }
 
-  const seconds = Math.max(0, Math.round((new Date(current.expiresAt) - Date.now()) / 1000));
-  $("pair-timer").textContent = `The code expires in ${seconds} seconds.`;
+  pairExpiresAt = new Date(current.expiresAt).getTime();
 
   if (current.status === "claimed" && current.phone) {
-    state.pairing = { pairingId: current.pairingId, fingerprint: current.phone.fingerprint };
+    state.pairing = { pairingId: current.pairingId, fingerprint: current.phone.fingerprint, nearby: current.nearby !== false };
     $("pair-phone-name").textContent = current.phone.name;
     $("pair-fingerprint").textContent = current.phone.fingerprint;
+    $("pair-nearby").textContent = state.pairing.nearby
+      ? "This phone is on the same network as this computer."
+      : "This phone is on a different network than this computer. Approve it only if you are sure it is yours.";
+    $("pair-nearby").classList.toggle("far", !state.pairing.nearby);
+    $("approve-btn").textContent = state.pairing.nearby ? "Approve" : "Approve anyway";
+    $("pair-share").hidden = true;          // the code has been used: it is of no use to anyone now
+    clearPairingSecrets();
     $("pair-confirm").hidden = false;
   }
 }
@@ -133,11 +156,30 @@ export function initDesktop(refresh) {
       return;
     }
 
+    // The code rides in the part of the link after "#", which browsers never send to any server.
+    const link = `${location.origin}/#pair=${result.code}`;
+    drawQr($("pair-qr"), link);
+    $("pair-link").value = link;
     $("pair-code").textContent = `${result.code.slice(0, 4)}-${result.code.slice(4)}`;
+    pairExpiresAt = new Date(result.expiresAt).getTime();
+    tickClock();
+    if (clockTimer) stopTimer(clockTimer);
+    clockTimer = every(1000, tickClock);
+
+    $("pair-share").hidden = false;
     $("pair-confirm").hidden = true;
     $("pair-box").hidden = false;
     $("pair-btn").hidden = true;
     startPairPolling();
+  });
+
+  $("copy-link-btn").addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText($("pair-link").value);
+      setStatus("Link copied. It works once, for 2 minutes.");
+    } catch (err) {
+      $("pair-link").select();               // no clipboard access: let the person copy it by hand
+    }
   });
 
   $("approve-btn").addEventListener("click", async () => {
@@ -145,7 +187,7 @@ export function initDesktop(refresh) {
     if (pairTimer) stopTimer(pairTimer);
 
     try {
-      await withReauth(() => approvePairing(identity, state.pairing.pairingId, state.pairing.fingerprint));
+      await withReauth(() => approvePairing(identity, state.pairing.pairingId, state.pairing.fingerprint, { confirmFar: !state.pairing.nearby }));
     } catch (err) {
       setStatus("Could not approve. Please try again.");
       startPairPolling();

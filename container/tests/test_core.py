@@ -508,3 +508,10 @@ def test_asgi_entry_point_wraps_the_flask_app():
     from app import app
 
     assert asgi.asgi_app.app is app
+
+
+def test_pairing_settings(fresh_config):
+    cfg = fresh_config()
+    assert cfg.PAIRING_CODE_TTL_SECONDS == 120
+    assert cfg.PAIRING_REQUIRE_NEARBY is False
+    assert fresh_config(PAIRING_REQUIRE_NEARBY="1").PAIRING_REQUIRE_NEARBY is True

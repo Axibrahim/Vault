@@ -263,6 +263,19 @@ body[data-panel="about"] #peers-box { display: none; }
 
 .about-bubble { display: grid; place-items: center; width: 32px; height: 32px; border: 1px solid rgba(185, 134, 58, 0.5); border-radius: 10px; background: rgba(240, 180, 91, 0.1); }
 
+/* ---------- Pairing with a QR code or link ---------- */
+
+.qr { width: min(100%, 208px); margin: 14px auto 6px; padding: 10px; border-radius: 16px; background: #fff; line-height: 0; }
+
+.qr svg { display: block; width: 100%; height: auto; }
+
+.qr:empty { display: none; }
+
+.pairbox > div > .row { flex-wrap: nowrap; margin-top: 10px; }
+
+.linkfield { flex: 1; min-width: 0; min-height: 44px; font: 0.78rem var(--mono); color: var(--muted); text-overflow: ellipsis; }
+
+.far { color: #ffb0a8; }
 
 /* ---------- Home card: stat tiles in one row, tidier dropzone and actions ---------- */
 #desktop-view .meta { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 18px 0; }

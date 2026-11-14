@@ -29,7 +29,11 @@ class BaseConfig:
     SENSITIVE_MAX_AGE_SECONDS = 600                # pairing / removing devices needs a sign-in this recent
 
     # -- Pairing --
-    PAIRING_CODE_TTL_SECONDS = 180                 # a pairing code works for 3 minutes
+    PAIRING_CODE_TTL_SECONDS = 120                 # a pairing code (and its QR code / link) works for 2 minutes
+    # 1 = only a phone on the same network as the computer may use the code. Off by default: a phone on mobile data,
+    # or one that reaches the internet over IPv6 while the computer uses IPv4, looks like "another network".
+    # Either way the computer shows whether the phone is on its network before you approve it.
+    PAIRING_REQUIRE_NEARBY = os.environ.get("PAIRING_REQUIRE_NEARBY", "") == "1"
 
     # -- Transfers (device to device; this server only helps the two devices find each other) --
     SIGNAL_MAX_WAIT_SECONDS = 25                   # one long-poll request waits at most this long

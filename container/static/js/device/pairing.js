@@ -21,7 +21,8 @@ export async function createPairing(identity) {
 }
 
 // Computer: approve exactly this phone (its fingerprint is part of what we sign).
-export async function approvePairing(identity, pairingId, phoneFingerprint) {
+// confirmFar: the person saw that this phone is NOT on this computer's network and approved it anyway.
+export async function approvePairing(identity, pairingId, phoneFingerprint, { confirmFar = false } = {}) {
   const challenge = await getChallenge();
   const signature = await signMessage(
     identity,
@@ -31,6 +32,7 @@ export async function approvePairing(identity, pairingId, phoneFingerprint) {
     deviceId: identity.deviceId,
     challenge,
     signature,
+    ...(confirmFar ? { confirmFar: true } : {}),
   });
 }
 
