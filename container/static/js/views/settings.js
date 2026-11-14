@@ -198,6 +198,7 @@ async function reload() {
 
 export async function openSettings() {
   if (isOpen) return;
+  document.dispatchEvent(new CustomEvent("vault-panel", { detail: "settings" }));
   isOpen = true;
   document.body.dataset.panel = "settings";
   $("settings-view").hidden = false;
@@ -227,6 +228,7 @@ export function initSettings(refresh) {
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && isOpen) closeSettings({ restoreFocus: true });
   });
+  document.addEventListener("vault-panel", (event) => { if (event.detail !== "settings" && isOpen) closeSettings(); });
   window.addEventListener("resize", () => { if (isOpen) moveInk(); });
 
   for (const id of TABS) $(`tab-${id}`).addEventListener("click", () => selectTab(id));

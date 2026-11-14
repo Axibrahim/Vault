@@ -12,6 +12,7 @@ import { showDesktop, initDesktop } from "./views/desktop.js";
 import { showPair, initPair } from "./views/pair.js";
 import { showPhone, initPhone } from "./views/phone.js";
 import { showOther } from "./views/other.js";
+import { closeSettings, initSettings, showSettingsButton } from "./views/settings.js";
 import { closeAbout, initAbout, showAboutButton } from "./views/about.js";
 import { initPwa } from "./ui/pwa.js";
 import { activateTransfers, deactivateTransfers, initTransfers } from "./transfer/controller.js";
