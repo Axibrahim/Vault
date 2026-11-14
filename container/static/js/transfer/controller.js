@@ -330,6 +330,7 @@ export function activateTransfers({ role, uid, identity, devices }) {
   running = { role, uid, deviceId: identity.deviceId };
   session = new TransferSession({
     dialsText: role === "desktop",
+    autoResume: true,
     identity,
     uid,
     peers,
@@ -487,7 +488,14 @@ export function initTransfers(refresh) {
   });
 
   // coming back to the page: show a fresh status straight away
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) beat(); });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) return;
+    beat();
+    if (session) session.networkBack();     // back on screen: retry an interrupted send now
+  });
+
+  // The browser says the internet is back: retry an interrupted send now instead of waiting for the timer.
+  window.addEventListener("online", () => { if (session) session.networkBack(); });
 
   const finish = async (list, save) => {
     await save(list.map((r) => r.file));
