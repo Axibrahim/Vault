@@ -220,6 +220,15 @@ export class TransferSession {
     if (out.retry.unref) out.retry.unref();
   }
 
+  // The internet is back, or the page is on screen again: retry an interrupted send now instead of waiting.
+  networkBack() {
+    const out = this.outgoing;
+    if (!out || this.link || out.running) return;
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+    clearTimeout(out.retry);
+    this.resume().catch(() => {});
+  }
+
   // Reads every file once and works out its SHA-256 (the digest the other device must match).
   async _prepare(out) {
     let done = 0;
