@@ -8,6 +8,7 @@
 // the batch number. That is what lets a sender that restarted pick the same files again and carry on.
 // Data that is not finished is deleted after KEEP_MS, and it is cleared when the person signs out.
 import { BLOCK_SIZE } from "./protocol.js";
+import { clearAllPending } from "./pending.js";
 
 const DB_NAME = "vault-partials";
 export const KEEP_MS = 24 * 60 * 60 * 1000;
@@ -140,4 +141,7 @@ export const removeFile = (key) => removeWhere((rec) => rec.key === key);
 export const sweep = (now = Date.now()) => removeWhere((rec) => rec.done || now - rec.updated > KEEP_MS);
 
 // On sign-out: nothing of this account stays in the browser.
-export const clearAll = () => removeWhere(() => true);
+export const clearAll = async () => {
+  await removeWhere(() => true);
+  await clearAllPending().catch(() => {});      // and the memory of an unfinished send
+};

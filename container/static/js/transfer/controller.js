@@ -11,6 +11,7 @@ import { saveToFiles, saveToGallery, isIos } from "./save.js";
 import { formatBytes } from "./safety.js";
 import { TransferSession } from "./session.js";
 import { FolderSink, PhoneSink, heldMap } from "./sinks.js";
+import { clearPending, loadPending, savePending } from "./pending.js";
 
 const BEAT_EVERY_MS = 1_000;
 
@@ -19,6 +20,8 @@ let running = null;        // { role, uid, deviceId }
 let pendingAnswer = null;
 let received = null;       // what the phone holds until the person saves it
 let wakeLock = null;
+let wakeAsking = false;
+let pending = null;        // an unfinished send remembered from before the page was closed
 
 let peers = [];            // the other kind of device: [{ id, name, ... }]
 let knownIds = new Set();  // every active device of the account
@@ -48,7 +51,15 @@ function lazyFolderSink(uid) {
 
 async function keepAwake(on) {
   try {
-    if (on && !wakeLock && navigator.wakeLock) wakeLock = await navigator.wakeLock.request("screen");
+    if (on && !wakeLock && !wakeAsking && navigator.wakeLock) {
+      wakeAsking = true;
+      try {
+        wakeLock = await navigator.wakeLock.request("screen");
+        wakeLock.addEventListener("release", () => { wakeLock = null; });   // the browser lets go when the page is hidden: ask again when it is back
+      } finally {
+        wakeAsking = false;
+      }
+    }
     if (!on && wakeLock) {
       await wakeLock.release();
       wakeLock = null;
@@ -137,8 +148,12 @@ function makeUi(role, uid) {
         ? `Live with ${name}`
         : status === "connecting" ? "Connecting…" : `Waiting for ${name} to be online`;
     },
+    sendEnded() {
+      forgetPending(uid);
+    },
     sent(count, total) {
       keepAwake(false);
+      forgetPending(uid);
       showTransfer("received", `Sent ${count} file${count === 1 ? "" : "s"}`, formatBytes(total));
       refreshHistory(500);
     },
@@ -297,6 +312,7 @@ export function deactivateTransfers() {
   closeClip();
   $("clip-input").value = "";               // shared text is never kept after leaving the screen
   session = null;
+  pending = null;
   running = null;
   stopPresence();
   if (pendingAnswer) pendingAnswer(false);
@@ -338,6 +354,7 @@ export function activateTransfers({ role, uid, identity, devices }) {
     ui: makeUi(role, uid),
   });
   session.start();
+  offerPending();
 
   $("peers-box").hidden = false;
   syncSendBoxes();
@@ -346,14 +363,14 @@ export function activateTransfers({ role, uid, identity, devices }) {
   loadHistory(identity.deviceId);
 }
 
-function startSending(files) {
+function startSending(files, { handles = null, peerId = null } = {}) {
   if (!session || files.length === 0) return;
   if (session.busy) {
     setStatus("Wait for the current transfer to finish.");
     return;
   }
 
-  const target = peers.find((p) => p.id === selectedId);
+  const target = peers.find((p) => p.id === (peerId || selectedId));
   if (!target) {
     setStatus("Pair a device to send to first.");
     return;
@@ -366,7 +383,118 @@ function startSending(files) {
 
   setStatus("");
   $("received-box").hidden = true;
-  session.send(files, target.id).catch((err) => showTransfer("interrupted", "Could not send", err.message, null, false));
+  savePending({
+    uid: running.uid,
+    peerId: target.id,
+    files: files.map((file, i) => ({ name: file.name, size: file.size, type: file.type, handle: handles && handles[i] ? handles[i] : null })),
+  }).catch(() => {});                      // remembered, so a closed page can carry on later
+  session.send(files, target.id).catch((err) => {
+    forgetPending();
+    showTransfer("interrupted", "Could not send", err.message, null, false);
+  });
+}
+
+// ---------------------------------------------------------------- unfinished sends
+
+// A send that was cut off when the page closed is remembered (names and sizes, plus a file handle where the
+// browser allows it). The files are matched again, and the receiver carries on from the blocks it already saved.
+function forgetPending(uid = running && running.uid) {
+  pending = null;
+  if (uid) clearPending(uid).catch(() => {});
+}
+
+function describePending(record) {
+  const names = record.files.slice(0, 3).map((f) => `${f.name} (${formatBytes(f.size)})`).join(", ");
+  return record.files.length > 3 ? `${names} and ${record.files.length - 3} more` : names;
+}
+
+function showPending() {
+  const peer = peers.find((p) => p.id === pending.peerId);
+  const many = pending.files.length > 1;
+  const how = pending.handlesOk ? "Tap Resume to continue." : `Tap Resume, then choose the same file${many ? "s" : ""} again.`;
+  showTransfer("interrupted", `Unfinished send to ${peer ? peer.name : "your device"}`, `${describePending(pending)}. ${how}`, null, true);
+}
+
+// Called when a screen starts: was a send cut off by a closed page?
+async function offerPending() {
+  const uid = running.uid;
+  const record = await loadPending(uid).catch(() => null);
+  if (!record || !running || running.uid !== uid || !session || session.busy) return;
+  if (!peers.some((p) => p.id === record.peerId)) return forgetPending(uid);
+  pending = { ...record, handlesOk: record.files.every((f) => f.handle) };
+  showPending();
+}
+
+// Chrome and Edge on a computer can hand back file handles, so a send can carry on without choosing the file again.
+async function pickFiles(inputId) {
+  if (window.showOpenFilePicker && inputId === "send-input") {
+    try {
+      const handles = await window.showOpenFilePicker({ multiple: true });
+      startSending(await Promise.all(handles.map((h) => h.getFile())), { handles });
+    } catch (err) {
+      if (err.name !== "AbortError") $(inputId).click();       // anything else: use the normal chooser
+    }
+    return;
+  }
+  $(inputId).click();
+}
+
+function chooseFiles() {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.multiple = true;
+    input.hidden = true;
+    document.body.append(input);
+    const finish = (list) => { input.remove(); resolve(list); };
+    input.addEventListener("change", () => finish([...input.files]));
+    input.addEventListener("cancel", () => finish([]));
+    input.click();
+  });
+}
+
+// Files the browser still has a handle for: no need to choose them again.
+async function filesFromHandles(list) {
+  try {
+    const files = [];
+    for (const item of list) {
+      const ok = (await item.handle.queryPermission({ mode: "read" })) === "granted"
+        || (await item.handle.requestPermission({ mode: "read" })) === "granted";
+      if (!ok) return null;
+      files.push(await item.handle.getFile());
+    }
+    return files;
+  } catch (err) {
+    return null;                        // the file moved or was deleted, or access was refused
+  }
+}
+
+function continuePending() {
+  const record = pending;
+  if (!record || !session || session.busy) return;
+
+  const go = (files) => {
+    const wanted = new Set(record.files.map((f) => `${f.name}|${f.size}`));
+    const same = files.filter((file) => wanted.has(`${file.name}|${file.size}`));
+    if (!same.length) {
+      setStatus(`Those are not the same files. Choose: ${describePending(record)}`);
+      return;
+    }
+    if (same.length < record.files.length) setStatus(`Continuing with ${same.length} of ${record.files.length} files`);
+    const handles = same.map((file) => (record.files.find((f) => f.name === file.name && f.size === file.size) || {}).handle || null);
+    startSending(same, { handles, peerId: record.peerId });
+    if (session && session.busy) pending = null;          // it started; if not, the card stays so the person can try again
+  };
+
+  if (record.handlesOk) {
+    filesFromHandles(record.files).then((files) => {
+      if (files) return go(files);
+      record.handlesOk = false;           // refused or gone: fall back to choosing the files again
+      showPending();
+    });
+    return;
+  }
+  chooseFiles().then((files) => { if (files.length) go(files); });
 }
 
 // ---------------------------------------------------------------- dropping files
@@ -389,14 +517,18 @@ function dropped(event) {
   event.preventDefault();
   $("send-box").classList.remove("over");
   const files = [];
+  const handles = [];                    // file handles, where the browser gives them (it must be asked right now)
   let skippedFolder = false;
   for (const item of event.dataTransfer.items || []) {
     const entry = item.webkitGetAsEntry && item.webkitGetAsEntry();
     if (entry && entry.isDirectory) skippedFolder = true;
-    else if (item.kind === "file" && item.getAsFile()) files.push(item.getAsFile());
+    else if (item.kind === "file" && item.getAsFile()) {
+      files.push(item.getAsFile());
+      handles.push(item.getAsFileSystemHandle ? item.getAsFileSystemHandle().catch(() => null) : Promise.resolve(null));
+    }
   }
   if (skippedFolder) setStatus("Folders can't be sent directly. Zip the folder first, then send the zip file.");
-  startSending(files);
+  Promise.all(handles).then((list) => startSending(files, { handles: list.map((h) => (h && h.kind === "file" ? h : null)) }));
 }
 
 // The whole page is the drop target. Dropping a file ANYWHERE must never make the browser open it
@@ -447,7 +579,7 @@ export function initTransfers(refresh) {
   PhoneSink.purge();
 
   const wire = (buttonId, inputId) => {
-    $(buttonId).addEventListener("click", () => $(inputId).click());
+    $(buttonId).addEventListener("click", () => pickFiles(inputId));
     $(inputId).addEventListener("change", (event) => {
       startSending([...event.target.files]);
       event.target.value = "";          // lets the same file be picked again
@@ -481,9 +613,13 @@ export function initTransfers(refresh) {
   $("incoming-accept").addEventListener("click", () => pendingAnswer && pendingAnswer(true));
   $("incoming-decline").addEventListener("click", () => pendingAnswer && pendingAnswer(false));
 
-  onTransferResume(() => session && session.resume());
+  onTransferResume(() => {
+    if (session && session.outgoing) return session.resume();     // the page stayed open: carry on from memory
+    if (pending) return continuePending();                         // the page was closed: get the files again
+  });
   onTransferCancel(() => {
     if (pendingAnswer) pendingAnswer(false);
+    forgetPending();
     if (session) session.cancel();
   });
 

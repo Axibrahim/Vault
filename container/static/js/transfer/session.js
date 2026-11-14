@@ -21,8 +21,8 @@ const WATCH_EVERY_MS = 5_000;
 const SEEN_OFFERS = 50;           // transfer ids remembered, so a replayed offer is ignored
 const TEXT_LINK_MAX_MS = 6 * 60 * 60 * 1000;   // the text link is replaced by a freshly authenticated one this often
 const TEXT_RETRY_MS = [2_000, 5_000, 15_000, 30_000];
-const RESUME_RETRY_MS = [3_000, 8_000, 20_000, 45_000, 90_000];   // pause before each automatic resume attempt
-const MAX_AUTO_RESUMES = 8;                                        // after this many, the person taps Resume themselves
+const RESUME_RETRY_MS = [2_000, 5_000, 10_000, 20_000, 30_000];   // pause before each automatic resume attempt
+const MAX_AUTO_RESUMES = 30;                                       // about 15 minutes, then the person taps Resume themselves
 
 const closeSafe = (thing) => { try { thing.close(); } catch (err) { /* already closed */ } };
 
@@ -178,9 +178,11 @@ export class TransferSession {
 
       if (err.cancelled) {
         this.outgoing = null;
+        if (this.ui.sendEnded) this.ui.sendEnded();
         this.ui.show("interrupted", "Cancelled", "The other device cancelled the transfer.", null, false);
       } else if (err.declined) {
         this.outgoing = null;
+        if (this.ui.sendEnded) this.ui.sendEnded();
         const why = err.declined === "folder"
           ? "Open Vault on the computer and allow access to the folder."
           : err.declined === "busy" ? "The other device is busy with another transfer." : "The other device declined the files.";
@@ -222,6 +224,12 @@ export class TransferSession {
 
   // The internet is back, or the page is on screen again: retry an interrupted send now instead of waiting.
   networkBack() {
+    // A page that was in the background has a dead connection it has not noticed yet: drop it now,
+    // so the transfer reconnects at once instead of waiting for the stall timer.
+    const live = this.link;
+    if (live && !live.ended && live.life.state === S.TRANSFERRING && Date.now() - live.lastActivity > 8_000) {
+      this._fail(live, new Error("The connection was lost while the page was in the background"));
+    }
     const out = this.outgoing;
     if (!out || this.link || out.running) return;
     if (typeof navigator !== "undefined" && navigator.onLine === false) return;
