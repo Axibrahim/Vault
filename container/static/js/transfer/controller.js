@@ -3,7 +3,7 @@
 import { api } from "../core/api.js";
 import { withReauth } from "../core/auth.js";
 import { folderPermission, getFolder } from "../device/folder.js";
-import { $, every, setStatus, stopTimer } from "../ui/dom.js";
+import { $, setStatus } from "../ui/dom.js";
 import { loadHistory } from "../ui/history.js";
 import { dropState, issueFor, renderPeers, sessionSummary, stateOf } from "../ui/peers.js";
 import { hideTransfer, onTransferCancel, onTransferResume, showTransfer } from "../ui/transfer.js";
@@ -247,16 +247,19 @@ async function beat() {
   }
 }
 
+// The heartbeat uses a plain interval on purpose. show() in ui/dom.js stops every timer made with every(), and it
+// runs on each refresh (for example right after a phone is paired). A timer made with every() was silently killed
+// there, the heartbeat stopped, and the new phone only showed as active after the browser was reopened.
 function startPresence() {
   stopPresence();
-  beatTimer = every(BEAT_EVERY_MS, beat);
+  beatTimer = setInterval(beat, BEAT_EVERY_MS);
   beat();
 }
 
 function stopPresence() {
   lastPaint = null;
   folderCheck = { at: 0, ok: false };
-  if (beatTimer) stopTimer(beatTimer);
+  if (beatTimer) clearInterval(beatTimer);
   beatTimer = null;
   presence = {};
   presenceLoaded = false;

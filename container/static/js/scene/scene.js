@@ -2,12 +2,12 @@ import * as THREE from "../../vendor/three.module.min.js";
 
 // Targets for each screen. The scene eases toward them, so changes feel physical.
 const STATES = {
-  login:   { spin: 0.12, bolts: 0,   open: 0, core: 0.35, color: 0xf0b45b, zoom: 9.0 },
-  enroll:  { spin: 0.45, bolts: 0,   open: 0, core: 0.8,  color: 0xf0b45b, zoom: 8.2 },
-  desktop: { spin: 0.18, bolts: 0.7, open: 1, core: 1.0,  color: 0x5be3a0, zoom: 7.6 },
-  other:   { spin: 0.05, bolts: 0,   open: 0, core: 0.25, color: 0xe5584b, zoom: 9.0 },
-  pair:    { spin: 0.45, bolts: 0.3, open: 0, core: 0.8,  color: 0xf0b45b, zoom: 8.2 },
-  phone:   { spin: 0.18, bolts: 0.7, open: 1, core: 1.0,  color: 0x5be3a0, zoom: 7.6 },
+  login:   { spin: 0.12, bolts: 0,   open: 0, core: 0.35, color: 0xf0b45b, zoom: 9.0, door: 1 },
+  enroll:  { spin: 0.45, bolts: 0,   open: 0, core: 0.8,  color: 0xf0b45b, zoom: 8.2, door: 1 },
+  desktop: { spin: 0.18, bolts: 0.7, open: 1, core: 1.0,  color: 0x5be3a0, zoom: 7.6, door: 0 },   // door 0 = home screens show only the diamond background
+  other:   { spin: 0.05, bolts: 0,   open: 0, core: 0.25, color: 0xe5584b, zoom: 9.0, door: 1 },
+  pair:    { spin: 0.45, bolts: 0.3, open: 0, core: 0.8,  color: 0xf0b45b, zoom: 8.2, door: 1 },
+  phone:   { spin: 0.18, bolts: 0.7, open: 1, core: 1.0,  color: 0x5be3a0, zoom: 7.6, door: 0 },
 };
 
 let target = STATES.login;
@@ -19,9 +19,9 @@ export function setSceneState(name) {
 
 const canvas = document.getElementById("scene");
 const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
-let renderer, scene, camera, rig, rings, bolts, core, coreMat, dust, light, crates;
+let renderer, scene, camera, rig, door, rings, bolts, core, coreMat, dust, light, crates, celebrateTimer;
 let pulse = 0;   // 1 right after a transfer succeeds, eases back to 0
-const cur = { spin: 0.12, bolts: 0, open: 0, core: 0.35, zoom: 9 };
+const cur = { spin: 0.12, bolts: 0, open: 0, core: 0.35, zoom: 9, door: 1 };
 const color = new THREE.Color(0xf0b45b);
 const mouse = { x: 0, y: 0 };
 const ease = (a, b, k) => a + (b - a) * k;
@@ -33,6 +33,9 @@ export function celebrate() {
   if (!renderer || still || !crates) return;
   crates.forEach((c, i) => { c.userData.t = -i * 0.2; });   // negative = staggered start delay
   pulse = 1;
+  document.body.classList.add("celebrate");                   // warms the background glow (see .geo::after)
+  clearTimeout(celebrateTimer);
+  celebrateTimer = setTimeout(() => document.body.classList.remove("celebrate"), 3200);
 }
 
 try {
@@ -47,6 +50,8 @@ try {
   const brass = new THREE.MeshStandardMaterial({ color: 0xb9863a, metalness: 0.9, roughness: 0.3 });
   rig = new THREE.Group();
   scene.add(rig);
+  door = new THREE.Group();   // the vault door parts; shrinks away on the home screens (see STATES.door)
+  rig.add(door);
 
   const outer = new THREE.Mesh(new THREE.TorusGeometry(2.7, 0.14, 24, 120), steel);
   const mid = new THREE.Mesh(new THREE.TorusGeometry(2.05, 0.07, 20, 100), brass);
@@ -61,19 +66,19 @@ try {
     ticks.add(t);
   }
   rings = { outer, mid, dial, ticks };
-  rig.add(outer, mid, dial, ticks);
+  door.add(outer, mid, dial, ticks);
 
   bolts = [];
   for (let i = 0; i < 8; i++) {
     const b = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.2, 0.2), steel);
     b.userData.a = (i / 8) * Math.PI * 2 + Math.PI / 8;
     bolts.push(b);
-    rig.add(b);
+    door.add(b);
   }
 
   coreMat = new THREE.MeshBasicMaterial({ color: 0xf0b45b, wireframe: true, transparent: true });
   core = new THREE.Mesh(new THREE.IcosahedronGeometry(0.75, 1), coreMat);
-  rig.add(core);
+  door.add(core);
 
   const pts = new Float32Array((phone ? 350 : 900) * 3);
   for (let i = 0; i < pts.length; i += 3) {
@@ -87,7 +92,7 @@ try {
 
   
   // Success crates (see celebrate()). They live in the rig, so they follow its position on every screen size.
-  const crateMat = new THREE.MeshStandardMaterial({ color: 0xf0b45b, metalness: 0.75, roughness: 0.3, emissive: 0x2a1a04 });
+  const crateMat = new THREE.MeshStandardMaterial({ color: 0xf0b45b, metalness: 0.35, roughness: 0.45, emissive: 0x6b4308 });
   const crateEdge = new THREE.LineBasicMaterial({ color: 0x1a1205, transparent: true, opacity: 0.55 });
   const makeCrate = (size, x, y, z) => {
     const g = new THREE.Group();
@@ -101,7 +106,7 @@ try {
     rig.add(g);
     return g;
   };
-  crates = [makeCrate(1.5, -0.4, 2.1, 1.2), makeCrate(0.9, -5.2, -1.6, 1.6)];
+  crates = [makeCrate(1.1, -0.5, 0.7, 0.6), makeCrate(0.7, -5.5, -1.0, 1.0)];
 
   scene.add(new THREE.AmbientLight(0xffffff, 0.35));
   light = new THREE.PointLight(0xf0b45b, 90, 30);
@@ -148,8 +153,11 @@ function fit() {
 
 function frame(dt) {
   const k = Math.min(1, dt * 2.2 || 1);
-  for (const key of ["spin", "bolts", "open", "core", "zoom"]) cur[key] = ease(cur[key], target[key], k);
-  color.lerp(new THREE.Color(target.color), k);
+  for (const key of ["spin", "bolts", "open", "core", "zoom", "door"]) cur[key] = ease(cur[key], target[key], k);
+  door.scale.setScalar(Math.max(0.0001, cur.door));
+  door.visible = dust.visible = cur.door > 0.01;
+  const crateActive = crates.some((c) => c.userData.t !== null);   // keep the light warm while the crates are showing
+  color.lerp(new THREE.Color(crateActive ? 0xf0b45b : target.color), k);
   const t = performance.now() / 1000;
 
   rings.mid.rotation.z += dt * (cur.spin + pulse * 3);

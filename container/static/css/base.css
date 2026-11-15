@@ -34,6 +34,9 @@ body {
 .geo i:nth-child(4) { --s: min(22.2vw, 320px); --x: 1.4%;  --y: 68.9%; --hx: 70%; --hi: #4e5c6c; }
 .geo i:nth-child(5) { --s: min(22.2vw, 320px); --x: 99.3%; --y: 71.1%; --hx: 30%; --hi: #4e5c6c; }
 .geo i:nth-child(6) { --s: min(26.4vw, 380px); --x: 50%;   --y: 88.9%; --hx: 50%; }
+/* success glow: warms the background for a moment when a transfer completes */
+.geo::after { content: ""; position: absolute; width: 760px; height: 760px; left: calc(82% - 380px); top: calc(36% - 380px); border-radius: 50%; background: radial-gradient(circle, rgba(240, 180, 91, 0.34) 0%, rgba(240, 180, 91, 0) 70%); opacity: 0; transition: opacity 0.7s ease; }
+body.celebrate .geo::after { opacity: 1; }
 
 .vignette { position: fixed; inset: 0; pointer-events: none; background: radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.88) 100%); }
 
