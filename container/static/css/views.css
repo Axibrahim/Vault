@@ -277,12 +277,51 @@ body[data-panel="about"] #peers-box { display: none; }
 
 .far { color: #ffb0a8; }
 
-/* ---------- Home card: stat tiles in one row, tidier dropzone and actions ---------- */
-#desktop-view .meta { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 18px 0; }
-#desktop-view .meta div { padding: 12px 14px; border-radius: 14px; background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.08); }
+/* ---------- Home card (matches the Figma design) ----------
+   Only on the computer's home screen: the card becomes a column, so the phones list can sit between the
+   dropzone and the buttons. The wrappers are "display: contents", so every id and script keeps working. */
+body[data-view="desktop"] .panel { display: flex; flex-direction: column; }
+body[data-view="desktop"] #app-view,
+body[data-view="desktop"] #desktop-view { display: contents; }
+
+/* order: header, tiles, dropzone, progress / pairing, phones, buttons, remove link */
+body[data-view="desktop"] #send-box { order: 1; margin: 0 0 20px; }
+body[data-view="desktop"] #transfer { order: 2; margin: 0 0 20px; }
+body[data-view="desktop"] #pair-box { order: 2; margin: 0 0 20px; }
+body[data-view="desktop"] #peers-box { order: 3; margin: 0 0 20px; padding: 0; border: 0; background: none; }
+body[data-view="desktop"] #desktop-view .actions { order: 4; margin: 0; }
+body[data-view="desktop"] #remove-btn { order: 5; }
+body[data-view="desktop"] #install-box { order: 6; }
+
+/* header: status, big name, Settings and About on the same row */
+body[data-view="desktop"] .panel > .panel-actions { top: 30px; right: 32px; }
+#desktop-view .eyebrow, #desktop-view h2 { padding-right: 190px; }
+#desktop-view .eyebrow { margin-bottom: 8px; }
+#desktop-view h2 { margin: 0; font-size: 2.25rem; font-weight: 700; line-height: 1.15; }
+
+/* three info tiles in one row */
+#desktop-view .meta { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 20px 0; }
+#desktop-view .meta div { padding: 14px; border-radius: 16px; background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.08); }
 #desktop-view .meta dt { font-size: 0.62rem; letter-spacing: 0.12em; }
-#desktop-view .meta dd { font-weight: 500; font-size: 0.95rem; }
-.sendbox { display: grid; justify-items: center; gap: 12px; padding: 26px 20px; text-align: center; border: 1.5px dashed rgba(240, 180, 91, 0.35); border-radius: 20px; background: rgba(255, 255, 255, 0.02); }
+#desktop-view .meta dd { margin-top: 6px; font-weight: 500; font-size: 0.92rem; }
+
+/* dropzone: icon, one primary button, caption */
+.sendbox { display: grid; justify-items: center; gap: 14px; padding: 28px 24px; text-align: center; border: 1.5px dashed rgba(240, 180, 91, 0.35); border-radius: 20px; background: rgba(255, 255, 255, 0.02); }
 .sendbox .hint { margin: 0; max-width: 34ch; }
-#desktop-view > .row:last-child { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); justify-content: space-between; }
-@media (max-width: 520px) { #desktop-view .meta { grid-template-columns: 1fr; } }
+.drop-ico { fill: none; stroke: var(--brass); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+/* phones list: small label, then clean rows */
+body[data-view="desktop"] #peers-box::before { content: "YOUR PHONES"; display: block; margin-bottom: 10px; font: 500 0.62rem var(--mono); letter-spacing: 0.18em; color: var(--muted); }
+body[data-view="desktop"] #peers-box .eyebrow { margin: 0 0 10px; font: 400 0.8rem var(--sans); letter-spacing: 0; text-transform: none; color: var(--muted); }
+body[data-view="desktop"] #peers-box .peers { margin: 0; }
+body[data-view="desktop"] #peers-box .peer { padding: 14px 16px; border-radius: 16px; border-color: rgba(255, 255, 255, 0.08); background: rgba(255, 255, 255, 0.03); }
+
+/* buttons: two equal secondary buttons, then a quiet red link */
+#desktop-view .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+#desktop-view .actions .btn { width: 100%; }
+#remove-btn:not([data-armed="true"]) { align-self: center; min-height: 0; margin-top: 16px; padding: 6px 10px; border: 0; background: none; color: #e5584b; font-size: 0.82rem; font-weight: 500; }
+#remove-btn:not([data-armed="true"]):hover { background: none; text-decoration: underline; }
+@media (max-width: 520px) {
+  #desktop-view .meta { grid-template-columns: 1fr; }
+  #desktop-view .eyebrow, #desktop-view h2 { padding-right: 0; }
+}

@@ -226,11 +226,8 @@
             <div><dt>Phones</dt><dd id="phone-status"></dd></div>
           </dl>
           <button id="regrant-btn" type="button" class="btn primary" hidden>Allow folder access</button>
-
-          <div class="row">
-            <button id="pair-btn" type="button" class="btn primary">Pair a phone</button>
-          </div>
           <div id="send-box" class="sendbox" hidden>
+            <svg class="drop-ico" viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><path d="M12 16V4m0 0L7 9m5-5 5 5M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
             <button id="send-btn" type="button" class="btn primary">Send files to phone</button>
             <input id="send-input" type="file" multiple hidden>
             <p class="hint">Or drop files here. Photos, videos, documents and zip files all work, any size.</p>
@@ -257,10 +254,11 @@
             </div>
           </div>
 
-          <div class="row">
+          <div class="row actions">
+            <button id="pair-btn" type="button" class="btn ghost">Pair a phone</button>
             <button id="change-folder-btn" type="button" class="btn ghost">Change folder</button>
-            <button id="remove-btn" type="button" class="btn danger">Remove this computer</button>
           </div>
+          <button id="remove-btn" type="button" class="btn danger">Remove this computer</button>
         </div>
 
         <div id="pair-view" hidden>
